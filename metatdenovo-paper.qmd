@@ -118,6 +118,22 @@ overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %
   relocate(run, assembler, orf_caller, bbnorm, minlen)
 ```
 
+```{r read-transrate}
+#| label: read-transrate
+#| warning: false
+transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
+  read_csv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  select(-fname, -run, -orf_caller) %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  relocate(assembler, bbnorm, minlen) %>%
+  distinct()
+```
+
 # Version history
 
 # Summary
@@ -146,14 +162,14 @@ cite_packages(output = "table", pkgs = "Session", out.dir = getwd()) %>%
 ## Execution traces
 
 * Quantification takes longest followed by QC, ORF calling and assembly
-* TODO: We need panel C: Assembly size
+* Read-depth normalization with BBDuk does not reduce time for assembly but considerably decrease memory usage
 
 See (**Fig. @fig-extraces**).
 
 ```{r fig-extraces}
 #| label: fig-extraces
-#| fig-height: 6
-#| fig-caption: '**CPU consumption and memory usage.** NN.'
+#| fig-height: 5
+#| fig-cap: '**CPU consumption, assembly memory usage and size.** A) Realtime cpu use per task type and pipeline execution, B) peak virtual memory usage and C) assembly size per assembly.'
 
 p0 <- extraces %>%
   filter(project == 'mst-1') %>%
@@ -164,7 +180,8 @@ p0 <- extraces %>%
   geom_col() +
   scale_fill_brewer('Process group', palette = 'Paired') +
   xlab('') + ylab('Seconds') +
-  coord_flip()
+  coord_flip() +
+  theme(axis.text.y = element_text(size=12))
 
 p1 <- extraces %>%
   filter(project == 'mst-1') %>%
@@ -177,12 +194,25 @@ p1 <- extraces %>%
   distinct() %>%
   ggplot(aes(x = assembler, y = peak_vmemc, colour = bbnorm)) +
   geom_point() +
+  scale_colour_discrete('') +
   xlab('') +
   ylab('Max. virtual memory (GB)') +
-  coord_flip()
+  coord_flip() +
+  theme(axis.text.y = element_text(size=12))
 
-p0 / p1 +
-  plot_layout(heights = c(3, 1)) +
+p2 <- transrates %>%
+  filter(project == 'mst-1') %>%
+  mutate(mbp = n_bases/1000^2 %>% round()) %>%
+  ggplot(aes(x = assembler, y = mbp, colour = bbnorm)) +
+  geom_point() +
+  scale_colour_discrete('') +
+  xlab('') +
+  ylab('Assembly size (Mbp)') +
+  coord_flip() +
+  theme(axis.text.y = element_text(size=12))
+
+p0 / ( p1 + p2 ) +
+  plot_layout(heights = c(4, 1), guides = 'collect') +
   plot_annotation(tag_levels = 'A')
 ```
 
