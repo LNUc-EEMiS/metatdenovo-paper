@@ -98,7 +98,7 @@ extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
   select(-p, -fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  relocate(run, assembler, orf_caller, bbnorm, minlen, process, sample)
+  relocate(project, run, assembler, orf_caller, bbnorm, minlen, process, sample)
 
 process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE)
 ```
@@ -115,7 +115,7 @@ overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %
   select(-fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  relocate(run, assembler, orf_caller, bbnorm, minlen)
+  relocate(project, run, assembler, orf_caller, bbnorm, minlen)
 ```
 
 ```{r read-transrate}
@@ -130,7 +130,7 @@ transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   select(-fname, -run, -orf_caller) %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  relocate(assembler, bbnorm, minlen) %>%
+  relocate(project, assembler, bbnorm, minlen) %>%
   distinct()
 ```
 
@@ -159,12 +159,17 @@ cite_packages(output = "table", pkgs = "Session", out.dir = getwd()) %>%
 
 # Results
 
-## Execution traces
+## MST-1
+
+### Resource usage and assembly quality with different parameter values
 
 * Quantification takes longest followed by QC, ORF calling and assembly
 * Read-depth normalization with BBDuk does not reduce time for assembly but considerably decrease memory usage
+* RNASpades created larger, but more fragmented assemblies than Megahit
+* The larger assemblies, the higher the proportion of reads mapping back to the assembly
+* The assemblies created with normalization did not attract proportionally lower proportions of reads -> normalization not such a bad idea! :-)
 
-See (**Fig. @fig-extraces**).
+See (**@fig-extraces** & **@tbl-assembly-stats**).
 
 ```{r fig-extraces}
 #| label: fig-extraces
@@ -214,6 +219,29 @@ p2 <- transrates %>%
 p0 / ( p1 + p2 ) +
   plot_layout(heights = c(4, 1), guides = 'collect') +
   plot_annotation(tag_levels = 'A')
+```
+
+```{r tbl-assembly-stats}
+#| label: tbl-assembly-stats
+#| tbl-cap: '**Overall statistics for MST-1 assemblies.**'
+
+transrates %>%
+  filter(project == 'mst-1') %>%
+  inner_join(
+    overall_stats %>% 
+      transmute(project, assembler, bbnorm, sample, prop_mapped = idxs_n_mapped/n_non_contaminated) %>%
+      distinct() %>%
+      group_by(project, assembler, bbnorm) %>%
+      summarise(mean_prop_mapped = mean(prop_mapped), .groups = 'drop'),
+    by = join_by(project, assembler, bbnorm)
+  ) %>%
+  transmute(
+    Assembly = str_c(assembler, bbnorm, sep = '.'),
+    `N. contigs` = n_seqs, `Size (Mbp)` = round(n_bases/1000^2, digits = 1),
+    `Lengths` = sprintf("%d-%d", smallest, largest), `Mean length (bp)` = round(mean_len), N50 = n50,
+    `Mean prop. mapped` = sprintf("%2.1f%%", mean_prop_mapped * 100)
+  ) %>%
+  kable()
 ```
 
 # Discussion
