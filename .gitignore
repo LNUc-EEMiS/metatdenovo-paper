@@ -70,3 +70,5 @@ multiqc_plots
 kofam
 .nextflow
 .nextflow.log*
+*_files
+*.html

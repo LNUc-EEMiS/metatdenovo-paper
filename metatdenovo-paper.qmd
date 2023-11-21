@@ -1,0 +1,79 @@
+---
+title: "nf-core/metatdenovo"
+author: "danilo.dileo@lnu.se, emelie.nilsson@lnu.se, ..., daniel.lundin@lnu.se"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+format:
+  html:
+    code-fold: true
+    toc: true
+bibliography:
+  - bibliography.bib
+  - grateful-refs.bib
+---
+
+```{r setup}
+#| label: setup
+#| echo: false
+#| cache: false
+
+knitr::opts_chunk$set(echo = TRUE, fig.path='figures/', cache = TRUE, fig.width = 10)
+ggplot2::theme_set(ggplot2::theme_bw())
+```
+
+```{r libraries}
+#| label: libraries
+#| message: false
+#| cache: false
+#| include: false
+
+library(readr)
+library(data.table)
+library(dtplyr)
+library(dplyr, warn.conflicts = FALSE)
+library(tidyr)
+library(purrr)
+library(stringr)
+library(ggplot2)
+library(kfigr)
+library(knitr)
+library(DT)
+library(grateful)
+library(patchwork)
+```
+
+```{r constants}
+#| label: constants
+```
+
+```{r read-execution-traces}
+#| label: read-data
+```
+
+# Version history
+
+# Summary
+
+# Introduction
+
+Cite nf-core [@nf-core].
+
+# Materials and Methods
+
+## R and packages
+
+This analysis was run with `r R.version$version.string`. Versions of packages used can be found in Table @tbl-cite-packages.
+
+```{r}
+#| label: tbl-cite-packages
+#| cache: false
+#| tbl-cap: Versions of R and packages used in this analysis.
+
+cite_packages(output = "table", pkgs = "Session", out.dir = getwd()) %>%
+  kable()
+```
+
+# Results
+
+# Discussion
+
+# References
