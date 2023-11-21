@@ -31,6 +31,7 @@ library(data.table)
 library(dtplyr)
 library(dplyr, warn.conflicts = FALSE)
 library(tidyr)
+library(lubridate)
 library(purrr)
 library(stringr)
 library(ggplot2)
@@ -47,6 +48,58 @@ library(patchwork)
 
 ```{r read-execution-traces}
 #| label: read-data
+extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
+  read_tsv(show_col_types = FALSE, id = 'fname') %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*'),
+    p       = str_remove(name, '.*:'),
+    process = str_remove(p, ' .*'),
+    sample  = str_replace(p, '.*\\((.*)\\)', '\\1'),
+    durationc  = str_remove(duration, ' *\\d+ms') %>%
+      ifelse(str_detect(., '\\dh'), ., str_c('0h', ., sep = ' ')) %>%
+      ifelse(str_detect(., '\\dm'), ., str_c('0m', ., sep = ' ')) %>%
+      ifelse(str_detect(., '\\ds'), ., str_c(., '0s', sep = ' ')) %>%
+      hms(),
+    realtimec  = str_remove(realtime, ' *\\d+ms') %>%
+      ifelse(str_detect(., '\\dh'), ., str_c('0h', ., sep = ' ')) %>%
+      ifelse(str_detect(., '\\dm'), ., str_c('0m', ., sep = ' ')) %>%
+      ifelse(str_detect(., '\\ds'), ., str_c(., '0s', sep = ' ')) %>%
+      hms(),
+    peak_rssc = case_when(
+      str_detect(peak_rss, 'GB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^3,
+      str_detect(peak_rss, 'MB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^2,
+      str_detect(peak_rss, 'KB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^1,
+      str_detect(peak_rss, 'B')  ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^0,
+      TRUE                       ~ 0
+    ),
+    peak_vmemc = case_when(
+      str_detect(peak_vmem, 'GB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^3,
+      str_detect(peak_vmem, 'MB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^2,
+      str_detect(peak_vmem, 'KB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^1,
+      str_detect(peak_vmem, 'B')  ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^0,
+      TRUE                       ~ 0
+    ),
+    rcharc = case_when(
+      str_detect(rchar, 'GB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^3,
+      str_detect(rchar, 'MB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^2,
+      str_detect(rchar, 'KB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^1,
+      str_detect(rchar, 'B')  ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^0,
+      TRUE                       ~ 0
+    ),
+    wcharc = case_when(
+      str_detect(wchar, 'GB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^3,
+      str_detect(wchar, 'MB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^2,
+      str_detect(wchar, 'KB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^1,
+      str_detect(wchar, 'B')  ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^0,
+      TRUE                       ~ 0
+    )
+  ) %>%
+  select(-p) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm'), remove = FALSE, sep = '\\.') %>%
+  relocate(run, assembler, orf_caller, bbnorm, process, sample)
+
+process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE)
 ```
 
 # Version history
@@ -73,6 +126,49 @@ cite_packages(output = "table", pkgs = "Session", out.dir = getwd()) %>%
 ```
 
 # Results
+
+## Execution traces
+
+* Quantification takes longest followed by QC, ORF calling and assembly
+* TODO: We need panel C: Assembly size
+
+See (**Fig. @fig-extraces**).
+
+```{r fig-extraces}
+#| label: fig-extraces
+#| fig-height: 6
+#| fig-caption: '**CPU consumption and memory usage.** NN.'
+
+p0 <- extraces %>%
+  filter(project == 'mst-1') %>%
+  left_join(process_groups, by = join_by(process)) %>%
+  group_by(process_group, run) %>%
+  summarise(realtimec = sum(realtimec), .groups = 'drop') %>%
+  ggplot(aes(x = run, y = realtimec, fill = process_group)) +
+  geom_col() +
+  scale_fill_brewer('Process group', palette = 'Paired') +
+  xlab('') + ylab('Seconds') +
+  coord_flip()
+
+p1 <- extraces %>%
+  filter(project == 'mst-1') %>%
+  left_join(process_groups, by = join_by(process)) %>%
+  filter(process_group == 'assembly') %>%
+  group_by(run) %>%
+  filter(peak_vmemc == max(peak_vmemc)) %>%
+  ungroup() %>%
+  transmute(assembler, bbnorm, peak_vmemc = round(peak_vmemc/1024^3)) %>%
+  distinct() %>%
+  ggplot(aes(x = assembler, y = peak_vmemc, colour = bbnorm)) +
+  geom_point() +
+  xlab('') +
+  ylab('Max. virtual memory (GB)') +
+  coord_flip()
+
+p0 / p1 +
+  plot_layout(heights = c(3, 1)) +
+  plot_annotation(tag_levels = 'A')
+```
 
 # Discussion
 
