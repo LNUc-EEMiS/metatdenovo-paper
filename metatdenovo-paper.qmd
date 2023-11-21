@@ -44,6 +44,8 @@ library(patchwork)
 
 ```{r constants}
 #| label: constants
+
+TAXON_RANKS_SORTED = c('root', 'domain', 'phylum', 'class', 'order', 'family', 'genus', 'species')
 ```
 
 ```{r read-execution-traces}
@@ -98,7 +100,8 @@ extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
   select(-p, -fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  relocate(project, run, assembler, orf_caller, bbnorm, minlen, process, sample)
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, process, sample)
 
 process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE)
 ```
@@ -115,7 +118,8 @@ overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %
   select(-fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  relocate(project, run, assembler, orf_caller, bbnorm, minlen)
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
 ```
 
 ```{r read-transrate}
@@ -130,7 +134,8 @@ transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   select(-fname, -run, -orf_caller) %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  relocate(project, assembler, bbnorm, minlen) %>%
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  relocate(project, assembly, assembler, bbnorm, minlen) %>%
   distinct()
 ```
 
@@ -146,7 +151,40 @@ counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
   select(-fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  relocate(project, run, assembler, orf_caller, bbnorm, minlen, sample)
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, sample)
+```
+
+```{r read-eukulele-gtdb}
+#| label: read-eukulele-gtdb
+
+# TODO: Update the glob when rerun with a more recent version of the pipeline
+eukulele <- Sys.glob('nextflow/*/*/summary_tables/*.taxonomy_classification.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  # TODO: Also remove this
+  rename_with(str_to_lower) %>%
+  mutate(
+    db      = 'GTDB',
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, db) %>%
+  mutate(
+    taxon_rank = case_when(
+      str_detect(domain,  'uncl\\.')  ~ 'root',
+      str_detect(phylum,  'uncl\\.')  ~ 'domain',
+      str_detect(class,   'uncl\\.')  ~ 'phylum',
+      str_detect(order,   'uncl\\.')  ~ 'class',
+      str_detect(family,  'uncl\\.')  ~ 'order',
+      str_detect(genus,   'uncl\\.')  ~ 'family',
+      str_detect(species, 'uncl\\.')  ~ 'genus',
+      TRUE                            ~ 'species'
+    ) %>% factor(levels = TAXON_RANKS_SORTED, ordered = TRUE)
+  )
 ```
 
 # Version history
@@ -277,11 +315,10 @@ See (**@fig-orf-calling**).
 
 p0 <- counts %>%
   filter(project == 'mst-1') %>%
-  group_by(run, assembler, orf_caller, bbnorm, orf) %>%
+  group_by(run, assembly, assembler, orf_caller, bbnorm, orf) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop_last') %>%
   mutate(cr = rank(desc(count), ties.method = 'first'), tpmr = rank(desc(tpm), ties.method = 'first')) %>%
   ungroup() %>%
-  mutate(assembler_norm = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
   ggplot(aes(x = cr, y = count, colour = n_samples)) +
   geom_point() +
   scale_colour_viridis_c('N. samples') +
@@ -289,12 +326,12 @@ p0 <- counts %>%
   geom_hline(yintercept = 1e1, linetype = 2) +
   xlab('') +
   ylab('N. mapped read pairs') +
-  facet_grid(assembler_norm ~ orf_caller) +
+  facet_grid(assembly ~ orf_caller) +
   theme(legend.position = 'bottom')
 
 p1 <- counts %>%
   filter(project == 'mst-1') %>%
-  mutate(assembly_orfc = sprintf("%s%s %s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), orf_caller)) %>%
+  mutate(assembly_orfc = sprintf("%s %s", assembly, orf_caller)) %>%
   group_by(assembly_orfc, sample) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop') %>%
   ggplot(aes(x = sample, y = count, fill = sample)) +
@@ -313,6 +350,36 @@ p0 + p1 +
   plot_annotation(tag_levels = 'A')
 ```
 
+* Large proportions of ORFs annotated at species level, particularly when weighted by count
+* Tendency that ORFs annotated at higher ranks are rarer than species-assigned ORFs.
+
+```{r fig-mst-1-annot-success}
+#| label: fig-mst-1-annot-success
+#| fig.height: 3
+#| fig-cap: '**GTDB taxonomic annotation success.** Unweighted, weighted by count and tpm respectively.'
+
+eukulele %>%
+  filter(project == 'mst-1', db == 'GTDB') %>%
+  inner_join(
+    counts %>%
+      group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
+      summarise(count = sum(count), tpm = sum(tpm), .groups = 'drop'),
+    by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf)
+  ) %>%
+  group_by(run, assembly, assembler, orf_caller, bbnorm, minlen, taxon_rank) %>%
+  summarise(`N. ORFs` = n(), count = sum(count), tpm = sum(tpm), .groups = 'drop') %>%
+  pivot_longer(`N. ORFs`:tpm, names_to = 'var', values_to = 'value') %>%
+  mutate(var = factor(var, levels = c('N. ORFs', 'count', 'tpm'), ordered = TRUE)) %>%
+  ggplot(aes(run, value, fill = taxon_rank)) +
+  geom_col() +
+  scale_fill_brewer('Rank', palette = 'Set1') +
+  facet_wrap(~var, scales = 'free_x') +
+  xlab('') + ylab('') +
+  coord_flip() +
+  theme(
+    axis.text.x = element_text(angle = 65, hjust = 1)
+  )
+```
 
 # Discussion
 
