@@ -1,0 +1,15 @@
+input: 'samples.csv'
+outdir: 'megahit.prokka.without_bbnorm'
+max_time: '7.day'
+max_cpus: 22
+max_memory: '126.GB'
+assembler: 'megahit'
+orf_caller: 'prokka'
+bbnorm: false
+skip_eukulele: false
+eukulele_dbpath: './eukulele/' 
+eukulele_db: 'gtdb'
+eggnog_dbpath: './eggnog/'
+skip_eggnog: false
+kofam_dir: './kofam'
+sequence_filter: '/data/silva/SILVA_138.1_LSU-SSU_Ref_tax_silva.fna'
