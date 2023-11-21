@@ -134,6 +134,21 @@ transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
   distinct()
 ```
 
+```{r read-counts}
+#| label: read-counts
+
+counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  relocate(project, run, assembler, orf_caller, bbnorm, minlen, sample)
+```
+
 # Version history
 
 # Summary
@@ -243,6 +258,61 @@ transrates %>%
   ) %>%
   kable()
 ```
+
+
+### ORF calling and annotation
+
+See (**@fig-orf-calling**).
+
+* The RNASpades assemblies generally have a longer tail of rare ORFs, particularly for the non-read-depth-normalized assembly
+* Read-depth normalization in general produces assemblies which after ORF calling have a much narrower count distribution
+* The difference between the two assembly programs is much stronger when ORFs are called with Prodigal rather than Prokka
+* Whereas most rare ORFs -- occurring in few samples -- have very low counts, a few rare ORFs, have very large counts -- contaminants or viruses?
+* The Prokka ORF caller in combination with read-depth normalization exhibit similar count distributions for both assembly programs
+* Counts much higher for NA2 with Prodigal than with Prokka, particularly for the RNASpades assembly: contamination?
+
+```{r fig-orf-calling}
+#| label: fig-orf-calling
+#| fig-cap: '**ORF calling statistics.** A) Rank-abundance curves per ORF with number of samples each ORF occurs in in colour. B) Counts per sample.'
+
+p0 <- counts %>%
+  filter(project == 'mst-1') %>%
+  group_by(run, assembler, orf_caller, bbnorm, orf) %>%
+  summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop_last') %>%
+  mutate(cr = rank(desc(count), ties.method = 'first'), tpmr = rank(desc(tpm), ties.method = 'first')) %>%
+  ungroup() %>%
+  mutate(assembler_norm = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  ggplot(aes(x = cr, y = count, colour = n_samples)) +
+  geom_point() +
+  scale_colour_viridis_c('N. samples') +
+  scale_y_log10() +
+  geom_hline(yintercept = 1e1, linetype = 2) +
+  xlab('') +
+  ylab('N. mapped read pairs') +
+  facet_grid(assembler_norm ~ orf_caller) +
+  theme(legend.position = 'bottom')
+
+p1 <- counts %>%
+  filter(project == 'mst-1') %>%
+  mutate(assembly_orfc = sprintf("%s%s %s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), orf_caller)) %>%
+  group_by(assembly_orfc, sample) %>%
+  summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop') %>%
+  ggplot(aes(x = sample, y = count, fill = sample)) +
+  geom_col() +
+  scale_colour_brewer('Sample', palette = 'Paired') +
+  xlab('') +
+  facet_wrap(~assembly_orfc, ncol = 2) +
+  theme(
+    legend.position = 'bottom',
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
+
+p0 + p1 +
+  plot_layout(widths = c(3, 2)) +
+  plot_annotation(tag_levels = 'A')
+```
+
 
 # Discussion
 
