@@ -72,3 +72,4 @@ kofam
 .nextflow.log*
 *_files
 *.html
+results

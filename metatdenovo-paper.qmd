@@ -95,11 +95,27 @@ extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
       TRUE                       ~ 0
     )
   ) %>%
-  select(-p) %>%
-  separate(run, c('assembler', 'orf_caller', 'bbnorm'), remove = FALSE, sep = '\\.') %>%
-  relocate(run, assembler, orf_caller, bbnorm, process, sample)
+  select(-p, -fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  relocate(run, assembler, orf_caller, bbnorm, minlen, process, sample)
 
 process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE)
+```
+
+```{r read-overall-stats}
+#| label: read-overall-stats
+#| warning: false
+overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  relocate(run, assembler, orf_caller, bbnorm, minlen)
 ```
 
 # Version history
