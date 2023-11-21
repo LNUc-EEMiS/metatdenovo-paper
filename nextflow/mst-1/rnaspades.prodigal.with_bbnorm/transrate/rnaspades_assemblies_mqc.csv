@@ -1,0 +1,2 @@
+assembly,n_seqs,smallest,largest,n_bases,mean_len,n_under_200,n_over_1k,n_over_10k,n_with_orf,mean_orf_percent,n90,n70,n50,n30,n10,gc,bases_n,proportion_n,score,optimal_score,cutoff,weighted
+/data/dl/metatdenovo/metatdenovo-paper/nextflow/mst-1/work/11/2926fbd8566d8292926ad3ec52982c/rnaspades.format_header.transcript.fa,119733,49,53965,67024935,512.42607,33880,13042,265,25725,64.65587,279,611,1398,3540,25378,0.4234,6450,0.0001,NA,NA,NA,NA
