@@ -297,6 +297,10 @@ transrates %>%
 
 ### ORF calling and annotation
 
+Prokka (REF), one of the two options to identify open reading frames (ORFs) in prokaryotes available in the workflow actually uses the other option, Prodigal (REF), to call ORFs but then proceeds with identification of other types of features and functional annotation. Prokka is generally more conservative with what it considers an ORF, although nf-core/metatdenovo by default uses the --metagenome parameter that is recommended for fragmented genomes and transcriptomes. As expected, Prokka returns much fewer ORFsthan Prodigal (NN Prokka ORFs and NN Prodigal ORFs in the Megahit assembly, and NN and NN respectively in the RNASpades assembly), although the proportion of reads NN% and NN% respectively in the RNASpades assembly). The combination RNAspades-Prodigal demonstrates its capability in identifying shorter, less common, and typically more elusive ORFs (Fig @fig-orf-calling A). This attribute can be particularly advantageous for projects with a focus on uncovering rare or concise ORFs, which might potentially be overlooked by Prokka's criteria. However, it is essential to acknowledge that Prodigal's less stringent approach could also introduce the risk of detecting false positive ORFs. This concern arises from the challenge of distinguishing genuine ORFs from potential artifacts. Consequently, for the majority of projects, Prokka's more conservative methodology proves more beneficial due to its precision and decreased susceptibility to false positives. Interestingly, these particular ORFs detected by Prodigal accumulate a total of NN reads, constituting a mere NN% of all the reads assigned to ORFs. We can speculate that those ORFs might be contaminants or viruses or even an artifact. 
+Read-depth normalization in general produces assemblies which after ORF calling have a much narrower count distribution. For instance, considering the Megahit assembly, Prodigal identifies approximately NN ORFs with a length shorter than NN amino acids, while Prokka doesn't identify any such ORFs. 
+We proceeded with the comparison by examining the counts of mapped reads obtained from different featureCounts outputs (Fig.@fig-orf-calling B). The combination of RNAspades and Prodigal outperformed the other combinations, achieving NN of mapped reads for all samples except for NA2, where the numbers were NN, a possible sign of contamination. 
+
 See (@fig-orf-calling).
 
 -   The RNASpades assemblies generally have a longer tail of rare ORFs, particularly for the non-read-depth-normalized assembly
@@ -346,6 +350,7 @@ p0 + p1 +
   plot_layout(widths = c(3, 2)) +
   plot_annotation(tag_levels = 'A')
 ```
+
 
 -   Large proportions of ORFs annotated at species level, particularly when weighted by count
 -   Tendency that ORFs annotated at higher ranks are rarer than species-assigned ORFs.
