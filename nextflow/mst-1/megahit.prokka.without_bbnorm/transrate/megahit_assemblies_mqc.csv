@@ -1,2 +1,0 @@
-assembly,n_seqs,smallest,largest,n_bases,mean_len,n_under_200,n_over_1k,n_over_10k,n_with_orf,mean_orf_percent,n90,n70,n50,n30,n10,gc,bases_n,proportion_n,score,optimal_score,cutoff,weighted
-/data/dl/metatdenovo/metatdenovo-paper/nextflow/mst-1/work/43/207a6d9091f183a1a37e924b34a97e/megahit_assembly.contigs.fa,97499,200,103660,68722046,704.84873,0,12664,196,36289,69.84301,347,492,777,1497,5231,0.43374,0,0.0,NA,NA,NA,NA
