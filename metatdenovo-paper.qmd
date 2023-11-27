@@ -216,13 +216,11 @@ cite_packages(output = "table", pkgs = "Session", out.dir = getwd()) %>%
 
 ### Resource usage and assembly quality with different parameter values
 
-* Quantification takes longest followed by QC, ORF calling and assembly
-* Read-depth normalization with BBDuk does not reduce time for assembly but considerably decrease memory usage
-* RNASpades created larger, but more fragmented assemblies than Megahit
-* The larger assemblies, the higher the proportion of reads mapping back to the assembly
-* The assemblies created with normalization did not attract proportionally lower proportions of reads -> normalization not such a bad idea! :-)
+With the Bunse et al. dataset (REF) consisting of surface water prokaryotic communities from a mesocosm experiment (see Materials and Methods for details), we wanted to test how different choices for assembly software and ORF caller, as well as read depth normalization influences the results. We ran nf-core/metatdenovo with six different parameter settings (Table MST-1-PARAMS). The initial steps of the pipeline -- quality checks, trimming, filtering out rRNAs -- were uniform across all downstream processing steps. After this, we ran read depth normalization to provide input reads for both RNASpades and Megahit. In addition, assembly with Megahit was performed with and without read depth normalization to compare the influence of this procedure, while RNASpades was only run after normalization.
 
-See (**@fig-extraces** & **@tbl-assembly-stats**).
+Our analysis shows how different the time and resource consumption of the different steps in the nf-core/metatdenovo pipeline can be based on a different combination of parameters. Quantification emerges as the most time-intensive process, closely followed by quality control (QC), open reading frame (ORF) calling, and assembly (Fig. @fig-extraces A).The option to normalize read coverage stands out as a strategy to optimize resource utilization. Leveraging BBNorm to reduce kmer coverage before assembly demonstrates a reduction in both running time and memory usage, addressing computational demand (Fig. @fig-extraces B). Read-depth normalization exhibits minimal impact on assembly and quantification steps. It influences ORF calling programs, leading to a reduction in resource consumption (numbers). BBnorm not only decreases running time but also proves to be memory-efficient, nearly halving memory usage compared to non-normalized options (@tbl-assembly-stats). The global efficiency gained by incorporating BBnorm across various combinations ranges from ?% to ?%, reflecting an enhancement in workflow performance. Comparing assembly outputs from RNASpades and Megahit reveals nuanced trade-offs. RNASpades generates larger but more fragmented assemblies but a higher proportion of reads mapping back to it. However, normalized assemblies do not attract proportionally fewer reads.
+
+See (@fig-extraces & @tbl-assembly-stats).
 
 ```{r fig-extraces}
 #| label: fig-extraces
@@ -297,17 +295,20 @@ transrates %>%
   kable()
 ```
 
-
 ### ORF calling and annotation
 
-See (**@fig-orf-calling**).
+Prokka (REF), one of the two options to identify open reading frames (ORFs) in prokaryotes available in the workflow actually uses the other option, Prodigal (REF), to call ORFs but then proceeds with identification of other types of features and functional annotation. Prokka is generally more conservative with what it considers an ORF, although nf-core/metatdenovo by default uses the --metagenome parameter that is recommended for fragmented genomes and transcriptomes. As expected, Prokka returns much fewer ORFsthan Prodigal (NN Prokka ORFs and NN Prodigal ORFs in the Megahit assembly, and NN and NN respectively in the RNASpades assembly), although the proportion of reads NN% and NN% respectively in the RNASpades assembly). The combination RNAspades-Prodigal demonstrates its capability in identifying shorter, less common, and typically more elusive ORFs (Fig @fig-orf-calling A). This attribute can be particularly advantageous for projects with a focus on uncovering rare or concise ORFs, which might potentially be overlooked by Prokka's criteria. However, it is essential to acknowledge that Prodigal's less stringent approach could also introduce the risk of detecting false positive ORFs. This concern arises from the challenge of distinguishing genuine ORFs from potential artifacts. Consequently, for the majority of projects, Prokka's more conservative methodology proves more beneficial due to its precision and decreased susceptibility to false positives. Interestingly, these particular ORFs detected by Prodigal accumulate a total of NN reads, constituting a mere NN% of all the reads assigned to ORFs. We can speculate that those ORFs might be contaminants or viruses or even an artifact. 
+Read-depth normalization in general produces assemblies which after ORF calling have a much narrower count distribution. For instance, considering the Megahit assembly, Prodigal identifies approximately NN ORFs with a length shorter than NN amino acids, while Prokka doesn't identify any such ORFs. 
+We proceeded with the comparison by examining the counts of mapped reads obtained from different featureCounts outputs (Fig.@fig-orf-calling B). The combination of RNAspades and Prodigal outperformed the other combinations, achieving NN of mapped reads for all samples except for NA2, where the numbers were NN, a possible sign of contamination. 
 
-* The RNASpades assemblies generally have a longer tail of rare ORFs, particularly for the non-read-depth-normalized assembly
-* Read-depth normalization in general produces assemblies which after ORF calling have a much narrower count distribution
-* The difference between the two assembly programs is much stronger when ORFs are called with Prodigal rather than Prokka
-* Whereas most rare ORFs -- occurring in few samples -- have very low counts, a few rare ORFs, have very large counts -- contaminants or viruses?
-* The Prokka ORF caller in combination with read-depth normalization exhibit similar count distributions for both assembly programs
-* Counts much higher for NA2 with Prodigal than with Prokka, particularly for the RNASpades assembly: contamination?
+See (@fig-orf-calling).
+
+-   The RNASpades assemblies generally have a longer tail of rare ORFs, particularly for the non-read-depth-normalized assembly
+-   Read-depth normalization in general produces assemblies which after ORF calling have a much narrower count distribution
+-   The difference between the two assembly programs is much stronger when ORFs are called with Prodigal rather than Prokka
+-   Whereas most rare ORFs -- occurring in few samples -- have very low counts, a few rare ORFs, have very large counts -- contaminants or viruses?
+-   The Prokka ORF caller in combination with read-depth normalization exhibit similar count distributions for both assembly programs
+-   Counts much higher for NA2 with Prodigal than with Prokka, particularly for the RNASpades assembly: contamination?
 
 ```{r fig-orf-calling}
 #| label: fig-orf-calling
@@ -350,8 +351,9 @@ p0 + p1 +
   plot_annotation(tag_levels = 'A')
 ```
 
-* Large proportions of ORFs annotated at species level, particularly when weighted by count
-* Tendency that ORFs annotated at higher ranks are rarer than species-assigned ORFs.
+
+-   Large proportions of ORFs annotated at species level, particularly when weighted by count
+-   Tendency that ORFs annotated at higher ranks are rarer than species-assigned ORFs.
 
 ```{r fig-mst-1-annot-success}
 #| label: fig-mst-1-annot-success
