@@ -100,7 +100,7 @@ extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
   select(-p, -fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, process, sample)
 
 process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE)
@@ -118,7 +118,7 @@ overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %
   select(-fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
 ```
 
@@ -134,7 +134,7 @@ transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   select(-fname, -run, -orf_caller) %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
   relocate(project, assembly, assembler, bbnorm, minlen) %>%
   distinct()
 ```
@@ -151,27 +151,24 @@ counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
   select(-fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, sample)
 ```
 
-```{r read-eukulele-gtdb}
-#| label: read-eukulele-gtdb
+```{r read-eukulele}
+#| label: read-eukulele
 
-# TODO: Update the glob when rerun with a more recent version of the pipeline
-eukulele <- Sys.glob('nextflow/*/*/summary_tables/*.taxonomy_classification.tsv.gz') %>%
+eukulele <- Sys.glob('nextflow/*/*/summary_tables/*_taxonomy.tsv.gz') %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
-  # TODO: Also remove this
-  rename_with(str_to_lower) %>%
   mutate(
-    db      = 'GTDB',
+    db      = str_replace(fname, 'nextflow\\/.*\\.(.*)_taxonomy.tsv.gz', '\\1'),
     project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
     run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
   ) %>%
   select(-fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, db) %>%
   mutate(
     taxon_rank = case_when(
@@ -228,7 +225,7 @@ See (@fig-extraces & @tbl-assembly-stats).
 #| fig-cap: '**CPU consumption, assembly memory usage and size.** A) Realtime cpu use per task type and pipeline execution, B) peak virtual memory usage and C) assembly size per assembly.'
 
 p0 <- extraces %>%
-  filter(project == 'mst-1') %>%
+  filter(project == 'mst-1', minlen == 0) %>%
   left_join(process_groups, by = join_by(process)) %>%
   group_by(process_group, run) %>%
   summarise(realtimec = sum(realtimec), .groups = 'drop') %>%
@@ -240,7 +237,7 @@ p0 <- extraces %>%
   theme(axis.text.y = element_text(size=12))
 
 p1 <- extraces %>%
-  filter(project == 'mst-1') %>%
+  filter(project == 'mst-1', minlen == 0) %>%
   left_join(process_groups, by = join_by(process)) %>%
   filter(process_group == 'assembly') %>%
   group_by(run) %>%
@@ -257,7 +254,7 @@ p1 <- extraces %>%
   theme(axis.text.y = element_text(size=12))
 
 p2 <- transrates %>%
-  filter(project == 'mst-1') %>%
+  filter(project == 'mst-1', minlen == 0) %>%
   mutate(mbp = n_bases/1000^2 %>% round()) %>%
   ggplot(aes(x = assembler, y = mbp, colour = bbnorm)) +
   geom_point() +
@@ -274,24 +271,25 @@ p0 / ( p1 + p2 ) +
 
 ```{r tbl-assembly-stats}
 #| label: tbl-assembly-stats
-#| tbl-cap: '**Overall statistics for MST-1 assemblies.**'
+#| tbl-cap: '**Overall statistics for MST-1 assemblies.** *) The assembly was made from read-normalized data. †) Contigs shorter than 200 nucleotides were removed.'
 
 transrates %>%
   filter(project == 'mst-1') %>%
   inner_join(
     overall_stats %>% 
-      transmute(project, assembler, bbnorm, sample, prop_mapped = idxs_n_mapped/n_non_contaminated) %>%
+      transmute(project, assembler, bbnorm, minlen, sample, prop_mapped = idxs_n_mapped/n_non_contaminated) %>%
       distinct() %>%
-      group_by(project, assembler, bbnorm) %>%
+      group_by(project, assembler, bbnorm, minlen) %>%
       summarise(mean_prop_mapped = mean(prop_mapped), .groups = 'drop'),
-    by = join_by(project, assembler, bbnorm)
+    by = join_by(project, assembler, bbnorm, minlen)
   ) %>%
   transmute(
-    Assembly = str_c(assembler, bbnorm, sep = '.'),
+    Assembly = assembly,
     `N. contigs` = n_seqs, `Size (Mbp)` = round(n_bases/1000^2, digits = 1),
     `Lengths` = sprintf("%d-%d", smallest, largest), `Mean length (bp)` = round(mean_len), N50 = n50,
     `Mean prop. mapped` = sprintf("%2.1f%%", mean_prop_mapped * 100)
   ) %>%
+  arrange(Assembly, `Min. contig length`) %>%
   kable()
 ```
 
@@ -312,7 +310,8 @@ See (@fig-orf-calling).
 
 ```{r fig-orf-calling}
 #| label: fig-orf-calling
-#| fig-cap: '**ORF calling statistics.** A) Rank-abundance curves per ORF with number of samples each ORF occurs in in colour. B) Counts per sample.'
+#| fig-height: 12
+#| fig-cap: '**ORF calling statistics.** A) Rank-abundance curves per ORF with number of samples each ORF occurs in in colour. B) Counts per sample. *) The assembly was made from read-depth-normalized data. †) Contigs shorter than 200 nucleotides were removed before ORF calling.'
 
 p0 <- counts %>%
   filter(project == 'mst-1') %>%
@@ -351,7 +350,6 @@ p0 + p1 +
   plot_annotation(tag_levels = 'A')
 ```
 
-
 -   Large proportions of ORFs annotated at species level, particularly when weighted by count
 -   Tendency that ORFs annotated at higher ranks are rarer than species-assigned ORFs.
 
@@ -361,7 +359,7 @@ p0 + p1 +
 #| fig-cap: '**GTDB taxonomic annotation success.** Unweighted, weighted by count and tpm respectively.'
 
 eukulele %>%
-  filter(project == 'mst-1', db == 'GTDB') %>%
+  filter(project == 'mst-1', db == 'gtdb') %>%
   inner_join(
     counts %>%
       group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
