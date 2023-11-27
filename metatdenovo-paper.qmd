@@ -141,6 +141,7 @@ transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
 
 ```{r read-counts}
 #| label: read-counts
+#| cache-lazy: false
 
 counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
@@ -182,6 +183,72 @@ eukulele <- Sys.glob('nextflow/*/*/summary_tables/*_taxonomy.tsv.gz') %>%
       TRUE                            ~ 'species'
     ) %>% factor(levels = TAXON_RANKS_SORTED, ordered = TRUE)
   )
+```
+
+```{r read-eggnogs}
+#| label: read-eggnogs
+#| cache-lazy: false
+
+eggnogs <- Sys.glob('nextflow/*/*/summary_tables/*.emapper.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
+```
+
+```{r read-kofams}
+#| label: read-kofams
+#| cache-lazy: false
+
+kofams <- Sys.glob('nextflow/*/*/summary_tables/*.kofamscan.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
+```
+
+```{r read-prokkas}
+#| label: read-prokkas
+#| cache-lazy: false
+
+prokkas <- Sys.glob('nextflow/*/*/summary_tables/*.prokka-annotations.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE, guess_max = 1e6) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
+```
+
+```{r func-annots}
+#| label: func-annots
+
+func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = 'eggnog') %>% distinct() %>%
+  union(
+    kofams %>% select(project:minlen, orf) %>% mutate(orf, annot = 'kofam') %>% distinct()
+  ) %>%
+  union(
+    prokkas %>% filter(product != 'hypothetical protein') %>% 
+      select(project:minlen, orf) %>% mutate(orf, annot = 'prokka') %>% distinct()
+  ) %>%
+  pivot_wider(names_from = annot, values_from = annot) %>%
+  unite(combination, c(eggnog, kofam, prokka), sep = '+', na.rm = TRUE)
 ```
 
 # Version history
@@ -289,7 +356,7 @@ transrates %>%
     `Lengths` = sprintf("%d-%d", smallest, largest), `Mean length (bp)` = round(mean_len), N50 = n50,
     `Mean prop. mapped` = sprintf("%2.1f%%", mean_prop_mapped * 100)
   ) %>%
-  arrange(Assembly, `Min. contig length`) %>%
+  arrange(Assembly) %>%
   kable()
 ```
 
@@ -310,7 +377,7 @@ See (@fig-orf-calling).
 
 ```{r fig-orf-calling}
 #| label: fig-orf-calling
-#| fig-height: 12
+#| fig-height: 9
 #| fig-cap: '**ORF calling statistics.** A) Rank-abundance curves per ORF with number of samples each ORF occurs in in colour. B) Counts per sample. *) The assembly was made from read-depth-normalized data. †) Contigs shorter than 200 nucleotides were removed before ORF calling.'
 
 p0 <- counts %>%
@@ -327,7 +394,11 @@ p0 <- counts %>%
   xlab('') +
   ylab('N. mapped read pairs') +
   facet_grid(assembly ~ orf_caller) +
-  theme(legend.position = 'bottom')
+  theme(
+    legend.position = 'bottom',
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank()
+  )
 
 p1 <- counts %>%
   filter(project == 'mst-1') %>%
@@ -355,10 +426,10 @@ p0 + p1 +
 
 ```{r fig-mst-1-annot-success}
 #| label: fig-mst-1-annot-success
-#| fig.height: 3
-#| fig-cap: '**GTDB taxonomic annotation success.** Unweighted, weighted by count and tpm respectively.'
+#| fig.height: 6
+#| fig-cap: '**Annotation success.** A) GTDB taxonomy and B) combinations of functional annotation. Unweighted, weighted by count and tpm respectively.'
 
-eukulele %>%
+p0 <- eukulele %>%
   filter(project == 'mst-1', db == 'gtdb') %>%
   inner_join(
     counts %>%
@@ -379,6 +450,31 @@ eukulele %>%
   theme(
     axis.text.x = element_text(angle = 65, hjust = 1)
   )
+
+p1 <- func_annots %>%
+  filter(project == 'mst-1') %>%
+  inner_join(
+    counts %>%
+      group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
+      summarise(count = sum(count), tpm = sum(tpm), .groups = 'drop'),
+    by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf)
+  ) %>%
+  group_by(run, assembly, assembler, orf_caller, bbnorm, minlen, combination) %>%
+  summarise(`N. ORFs` = n(), count = sum(count), tpm = sum(tpm), .groups = 'drop') %>%
+  pivot_longer(`N. ORFs`:tpm, names_to = 'var', values_to = 'value') %>%
+  mutate(var = factor(var, levels = c('N. ORFs', 'count', 'tpm'), ordered = TRUE)) %>%
+  ggplot(aes(run, value, fill = combination)) +
+  geom_col() +
+  scale_fill_brewer('Annotation tools', palette = 'Set2') +
+  facet_wrap(~var, scales = 'free_x') +
+  xlab('') + ylab('') +
+  coord_flip() +
+  theme(
+    axis.text.x = element_text(angle = 65, hjust = 1)
+  )
+
+p0 / p1 +
+  plot_annotation(tag_levels = 'A')
 ```
 
 # Discussion
