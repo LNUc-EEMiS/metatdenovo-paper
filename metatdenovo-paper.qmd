@@ -6,6 +6,10 @@ format:
   html:
     code-fold: true
     toc: true
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
 bibliography:
   - bibliography.bib
   - grateful-refs.bib
