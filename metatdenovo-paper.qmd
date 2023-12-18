@@ -143,6 +143,31 @@ transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
   distinct()
 ```
 
+```{r read-idxstats}
+#| label: read-idxstats
+
+#idxstats <- Sys.glob('nextflow/*/*/samtools/*.KA1.idxstats') %>%
+idxstats <- Sys.glob('nextflow/*/*/samtools/*.idxstats') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE, col_names = c('contig', 'length', 'n_mapped', 'n_unmapped')) %>%
+  filter(contig != '*', n_mapped > 0) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname,  'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*') %>% str_replace('^([^.]+)\\.[^.]+(.*)', '\\1\\2'),
+    sample  = str_replace(fname, '.*\\.([^.]+).idxstats', '\\1')
+  ) %>%
+  select(-fname) %>%
+  distinct() %>%
+  mutate(r = n_mapped/length) %>%
+  group_by(project, run, sample) %>%
+  mutate(tpm = r/sum(r) * 1e6) %>%
+  ungroup() %>%
+  select(-r) %>%
+  separate(run, c('assembler', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  relocate(project, run, assembly, assembler, bbnorm, minlen, sample)
+```
+
 ```{r read-counts}
 #| label: read-counts
 #| cache-lazy: false
@@ -253,6 +278,15 @@ func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = '
   ) %>%
   pivot_wider(names_from = annot, values_from = annot) %>%
   unite(combination, c(eggnog, kofam, prokka), sep = '+', na.rm = TRUE)
+```
+
+```{r toporfs}
+toporfs <- counts %>%
+  filter(count >= 5) %>%
+  group_by(project, run, assembly, assembler, orf_caller, bbnorm, minlen, orf) %>%
+  summarise(max_tpm = max(tpm), n_samples = n(), .groups = 'drop') %>%
+  filter(max_tpm > 1e5) %>%
+  arrange(desc(max_tpm))
 ```
 
 # Version history
@@ -384,25 +418,30 @@ See (@fig-orf-calling).
 #| fig-height: 10
 #| fig-cap: '**ORF calling statistics.** A) Rank-abundance curves per ORF with number of samples each ORF occurs in in colour. B) Counts per sample. *) The assembly was made from read-depth-normalized data. †) Contigs shorter than 200 nucleotides were removed before ORF calling.'
 
+plot_rank_abundance <- function(ds) {
+  ds %>%
+    ggplot(aes(x = cr, y = count, colour = n_samples)) +
+    geom_point() +
+    scale_colour_viridis_c('N. samples') +
+    scale_y_log10() +
+    geom_hline(yintercept = 1e1, linetype = 2) +
+    xlab('') +
+    ylab('N. mapped read pairs') +
+    facet_grid(assembly ~ orf_caller) +
+    theme(
+      legend.position = 'bottom',
+      axis.text.x = element_blank(),
+      axis.ticks.x = element_blank()
+    )
+}
+
 p0 <- counts %>%
   filter(project == 'mst-1') %>%
   group_by(run, assembly, assembler, orf_caller, bbnorm, orf) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop_last') %>%
   mutate(cr = rank(desc(count), ties.method = 'first'), tpmr = rank(desc(tpm), ties.method = 'first')) %>%
   ungroup() %>%
-  ggplot(aes(x = cr, y = count, colour = n_samples)) +
-  geom_point() +
-  scale_colour_viridis_c('N. samples') +
-  scale_y_log10() +
-  geom_hline(yintercept = 1e1, linetype = 2) +
-  xlab('') +
-  ylab('N. mapped read pairs') +
-  facet_grid(assembly ~ orf_caller) +
-  theme(
-    legend.position = 'bottom',
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank()
-  )
+  plot_rank_abundance()
 
 p1 <- counts %>%
   filter(project == 'mst-1') %>%
@@ -439,6 +478,77 @@ p2 <- counts %>%
 -   Tendency that ORFs annotated at higher ranks are rarer than species-assigned ORFs.
 - Why are mean tpms so low with Prodigal? Could it be explained by rare ORFs,
 in particular singletons from NA2?
+
+```{r fig-na2-rank-abundance}
+#| label: fig-na2-rank-abundance
+#| include: false
+
+# I made this as an experiment to see if this was the way of showing what's going on in NA2, but it doesn't
+# work so well.
+counts %>%
+  filter(project == 'mst-1', sample == 'NA2') %>%
+  group_by(run, assembly, assembler, orf_caller, bbnorm, orf) %>%
+  summarise(count = sum(count), tpm = sum(tpm), .groups = 'drop_last') %>%
+  mutate(cr = rank(desc(count), ties.method = 'first'), tpmr = rank(desc(tpm), ties.method = 'first')) %>%
+  ungroup() %>%
+  inner_join(
+    counts %>%
+      filter(project == 'mst-1') %>%
+      count(run, orf, name = 'n_samples'),
+    by = join_by(run, orf)
+  ) %>%
+  plot_rank_abundance()
+```
+
+### What's the matter with NA2?
+
+* Extreme abundances for contigs and ORFs
+* Not seen in any other sample
+
+```{r fig-top-abundances}
+#| label: fig-top-abundances
+#| fig-cap: '**Ten most abundant A) contigs and B) ORFs per assembly and ORF caller.**'
+#| fig-height: 10
+
+p0 <- idxstats %>%
+  filter(project == 'mst-1') %>%
+  group_by(project, run, assembly, assembler, bbnorm, minlen, contig) %>%
+  summarise(max_tpm = max(tpm), .groups = 'drop_last') %>%
+  slice_max(n = 10, order_by = max_tpm) %>%
+  ungroup() %>%
+  inner_join(idxstats %>% select(project, run, contig, sample, tpm), by = join_by(project, run, contig)) %>%
+  ggplot(aes(x = contig, y = tpm, fill = sample)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap(~assembly, scale = 'free_y', ncol = 6) +
+  xlab('') +
+  scale_y_continuous(limits = c(0, 5e5), breaks = seq(2.5e5, 2.5e5, 2.5e5), labels = scales::scientific) +
+  theme(
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+  
+p1 <- counts %>%
+  filter(project == 'mst-1') %>%
+  group_by(project, run, assembly, assembler, orf_caller, bbnorm, minlen, orf) %>%
+  summarise(max_tpm = max(tpm), .groups = 'drop_last') %>%
+  slice_max(n = 10, order_by = max_tpm) %>%
+  ungroup() %>%
+  inner_join(counts %>% select(project, run, orf, sample, tpm), by = join_by(project, run, orf)) %>%
+  mutate(assembly_orfc = sprintf("%s %s", assembly, orf_caller)) %>%
+  ggplot(aes(x = orf, y = tpm, fill = sample)) +
+  geom_col() +
+  coord_flip() +
+  facet_wrap(~assembly_orfc, ncol = 2, scale = 'free_y') +
+  theme(
+    axis.text.y  = element_blank(),
+    axis.ticks.y = element_blank()
+  )
+
+p0 / p1 +
+  plot_layout(heights = c(1,4), guides = 'collect') +
+  plot_annotation(tag_levels = 'A')
+```
 
 ```{r fig-mst-1-annot-success}
 #| label: fig-mst-1-annot-success
