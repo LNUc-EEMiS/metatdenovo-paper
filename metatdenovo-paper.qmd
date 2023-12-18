@@ -20,7 +20,7 @@ bibliography:
 #| echo: false
 #| cache: false
 
-knitr::opts_chunk$set(echo = TRUE, fig.path='figures/', cache = TRUE, fig.width = 10)
+knitr::opts_chunk$set(echo = TRUE, fig.path='figures/', cache = FALSE, fig.width = 10)
 ggplot2::theme_set(ggplot2::theme_bw())
 ```
 
@@ -50,6 +50,7 @@ library(patchwork)
 #| label: constants
 
 TAXON_RANKS_SORTED = c('root', 'domain', 'phylum', 'class', 'order', 'family', 'genus', 'species')
+mst1.samples.color <- c("#ea3a25", "#f09536", "#1a43f5", "#74fafd")
 ```
 
 ```{r read-execution-traces}
@@ -214,6 +215,19 @@ eukulele <- Sys.glob('nextflow/*/*/summary_tables/*_taxonomy.tsv.gz') %>%
   )
 ```
 
+```{r create table for tax-annots from original paper }
+#| label: tax-annots-og
+
+original.tax <- tibble(
+  sample = c(rep("Lca",7), rep("Lcc",7), rep("Hca",7), rep("Hcc",7)),
+  family = c(rep(c("Other Flavobacteria", "Flavobacteriaceae", "Other Gammaproteobacteria", "Alteromonadaceae", "Other Alphaproteobacteria", "SAR11 clade", "Rhodobacteraceae"),4)),
+  tpm = c(0.1, 0.5, 2.3, 2.4, 0.3, 0.4, 0.1,
+          0.1, 0.5, 2.3, 2.3, 0.5, 0.2, 0.1,
+          0.3, 0.5, 2.5, 0.7, 0.4, 0.1, 0.1,
+          0.1, 0.7, 2.5, 1.7, 0.9, 0.2, 0.2)
+  )
+```
+
 ```{r read-eggnogs}
 #| label: read-eggnogs
 #| cache-lazy: false
@@ -229,6 +243,20 @@ eggnogs <- Sys.glob('nextflow/*/*/summary_tables/*.emapper.tsv.gz') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
   mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
+
+eggnogs.edger <- read_tsv(
+  'nextflow/mst-1/megahit.prokka.without_bbnorm/summary_tables/megahit.prokka.emapper.tsv.gz',
+  show_col_types = FALSE
+) %>%
+  rename_all(str_to_lower) %>%
+  select(orf, eggnog_ogs, cog_category, description, preferred_name) %>%
+  separate_rows(eggnog_ogs, sep = ',') %>%
+  separate(eggnog_ogs, c('eggnog', 'taxon'), sep = '@') %>%
+  # Some ORFs have duplicate annotations for a taxon
+  group_by(orf, taxon) %>%
+  arrange(eggnog) %>%
+  filter(row_number() == 1) %>%
+  ungroup()
 ```
 
 ```{r read-kofams}
@@ -265,6 +293,14 @@ prokkas <- Sys.glob('nextflow/*/*/summary_tables/*.prokka-annotations.tsv.gz') %
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
 ```
 
+```{r read-edger-output}
+#| label: read-edger-output
+#| cache-lazy: false
+
+# the analysis is made out the run megahit.prokka_without_normalization
+edger <- read_tsv('tables/mst-1_megahit.prokka.without_bbnorm.edger.tsv.gz', show_col_types = FALSE, guess_max = 1e6)
+```
+
 ```{r func-annots}
 #| label: func-annots
 
@@ -289,6 +325,18 @@ toporfs <- counts %>%
   arrange(desc(max_tpm))
 ```
 
+```{r func-annots-og}
+#| label: func-annots-og
+
+original.fun <- tibble(
+  sample = c(rep("Lca",13), rep("Lcc",13), rep("Hca",13), rep("Hcc",13)),
+  SEED = c(rep(c("Protein metabolism", "Clustering-based subsystem", "RNA Metabolism", "Membrane Transport", "Carbohydrates", "Miscellaneous", "Amino Acids and Derivates", "Respiration", "Cofactors, vitamins, Pigments", "Iron acquisition and mtabolism", "Nucleosiles and Nucleotides", "Fatty Acids", "Photosynthesis"),4)),
+  tpm = c(2.9, 1.8, 0.9, 1.1, 0.8, 0.88, 0.70, 0.88, 0.5, 0.5, 0.3, 0.15, 0.35,
+          3.3, 2, 1, 1, 0.82, 0.89, 0.72, 0.72, 0.52, 0.48, 0.33, 0.17, 0.3,
+          2.9, 2.4, 0.85, 0.85, 0.96, 0.78, 0.80, 0.70, 0.57, 0.45, 0.4, 0.25, 0.15,
+          3.1, 2.2, 0.88, 0.88, 0.97, 0.88, 0.78, 0.77, 0.56, 0.46, 0.35, 0.3, 0.2))
+```
+
 # Version history
 
 # Summary
@@ -303,7 +351,7 @@ Cite nf-core [@nf-core].
 
 This analysis was run with `r R.version$version.string`. Versions of packages used can be found in Table @tbl-cite-packages.
 
-```{r}
+```{r tbl-cite-packages}
 #| label: tbl-cite-packages
 #| cache: false
 #| tbl-cap: Versions of R and packages used in this analysis.
@@ -317,10 +365,6 @@ cite_packages(output = "table", pkgs = "Session", out.dir = getwd()) %>%
 ## MST-1
 
 ### Resource usage and assembly quality with different parameter values
-
-With the Bunse et al. dataset (REF) consisting of surface water prokaryotic communities from a mesocosm experiment (see Materials and Methods for details), we wanted to test how different choices for assembly software and ORF caller, as well as read depth normalization influences the results. We ran nf-core/metatdenovo with six different parameter settings (Table MST-1-PARAMS). The initial steps of the pipeline -- quality checks, trimming, filtering out rRNAs -- were uniform across all downstream processing steps. After this, we ran read depth normalization to provide input reads for both RNASpades and Megahit. In addition, assembly with Megahit was performed with and without read depth normalization to compare the influence of this procedure, while RNASpades was only run after normalization.
-
-Our analysis shows how different the time and resource consumption of the different steps in the nf-core/metatdenovo pipeline can be based on a different combination of parameters. Quantification emerges as the most time-intensive process, closely followed by quality control (QC), open reading frame (ORF) calling, and assembly (Fig. @fig-extraces A).The option to normalize read coverage stands out as a strategy to optimize resource utilization. Leveraging BBNorm to reduce kmer coverage before assembly demonstrates a reduction in both running time and memory usage, addressing computational demand (Fig. @fig-extraces B). Read-depth normalization exhibits minimal impact on assembly and quantification steps. It influences ORF calling programs, leading to a reduction in resource consumption (numbers). BBnorm not only decreases running time but also proves to be memory-efficient, nearly halving memory usage compared to non-normalized options (@tbl-assembly-stats). The global efficiency gained by incorporating BBnorm across various combinations ranges from ?% to ?%, reflecting an enhancement in workflow performance. Comparing assembly outputs from RNASpades and Megahit reveals nuanced trade-offs. RNASpades generates larger but more fragmented assemblies but a higher proportion of reads mapping back to it. However, normalized assemblies do not attract proportionally fewer reads.
 
 See (@fig-extraces & @tbl-assembly-stats).
 
@@ -400,10 +444,6 @@ transrates %>%
 
 ### ORF calling and annotation
 
-Prokka (REF), one of the two options to identify open reading frames (ORFs) in prokaryotes available in the workflow actually uses the other option, Prodigal (REF), to call ORFs but then proceeds with identification of other types of features and functional annotation. Prokka is generally more conservative with what it considers an ORF, although nf-core/metatdenovo by default uses the --metagenome parameter that is recommended for fragmented genomes and transcriptomes. As expected, Prokka returns much fewer ORFsthan Prodigal (NN Prokka ORFs and NN Prodigal ORFs in the Megahit assembly, and NN and NN respectively in the RNASpades assembly), although the proportion of reads NN% and NN% respectively in the RNASpades assembly). The combination RNAspades-Prodigal demonstrates its capability in identifying shorter, less common, and typically more elusive ORFs (Fig @fig-orf-calling A). This attribute can be particularly advantageous for projects with a focus on uncovering rare or concise ORFs, which might potentially be overlooked by Prokka's criteria. However, it is essential to acknowledge that Prodigal's less stringent approach could also introduce the risk of detecting false positive ORFs. This concern arises from the challenge of distinguishing genuine ORFs from potential artifacts. Consequently, for the majority of projects, Prokka's more conservative methodology proves more beneficial due to its precision and decreased susceptibility to false positives. Interestingly, these particular ORFs detected by Prodigal accumulate a total of NN reads, constituting a mere NN% of all the reads assigned to ORFs. We can speculate that those ORFs might be contaminants or viruses or even an artifact. 
-Read-depth normalization in general produces assemblies which after ORF calling have a much narrower count distribution. For instance, considering the Megahit assembly, Prodigal identifies approximately NN ORFs with a length shorter than NN amino acids, while Prokka doesn't identify any such ORFs. 
-We proceeded with the comparison by examining the counts of mapped reads obtained from different featureCounts outputs (Fig.@fig-orf-calling B). The combination of RNAspades and Prodigal outperformed the other combinations, achieving NN of mapped reads for all samples except for NA2, where the numbers were NN, a possible sign of contamination. 
-
 See (@fig-orf-calling).
 
 -   The RNASpades assemblies generally have a longer tail of rare ORFs, particularly for the non-read-depth-normalized assembly
@@ -476,8 +516,7 @@ p2 <- counts %>%
 
 -   Large proportions of ORFs annotated at species level, particularly when weighted by count
 -   Tendency that ORFs annotated at higher ranks are rarer than species-assigned ORFs.
-- Why are mean tpms so low with Prodigal? Could it be explained by rare ORFs,
-in particular singletons from NA2?
+-   Why are mean tpms so low with Prodigal? Could it be explained by rare ORFs, in particular singletons from NA2?
 
 ```{r fig-na2-rank-abundance}
 #| label: fig-na2-rank-abundance
@@ -601,6 +640,213 @@ p1 <- func_annots %>%
 
 p0 / p1 +
   plot_annotation(tag_levels = 'A')
+```
+
+### Functional annotation - comparison with original data
+
+```{r fig-mst-1-func-annot-comparison}
+#| label: fig-mst-1-annot-comparison
+#| fig.height: 6
+#| fig-cap: '**Annotation comparison** A) Eggnogs COG category and B) SEED category from original paper.'
+
+# it makes easier to compare one type of run with the original function annotation. 
+# we can have as supplementary figures a plot with all the combination.
+# here I will plot megahit.prokka.without_bbnorm vs original paper
+
+# Classification by COG category
+counts.eggnogs <- counts %>%
+  mutate(sample = if_else(grepl("KA1", sample), 'Lca', sample)) %>%
+  mutate(sample = if_else(grepl("KA2", sample), 'Lca', sample)) %>%
+  mutate(sample = if_else(grepl("NA1", sample), 'Hca', sample)) %>%
+  mutate(sample = if_else(grepl("NA2", sample), 'Hca', sample)) %>%
+  mutate(sample = if_else(grepl("KB1", sample), 'Lcc', sample)) %>%
+  mutate(sample = if_else(grepl("KB2", sample), 'Lcc', sample)) %>%
+  mutate(sample = if_else(grepl("NB1", sample), 'Hcc', sample)) %>%
+  mutate(sample = if_else(grepl("NB2", sample), 'Hcc', sample)) %>%
+  group_by(project, run, assembler, orf_caller, bbnorm, minlen, sample, orf) %>%
+  summarise(m_tpm = mean(tpm),
+            sd = sd(tpm), 
+            .groups = 'drop') %>%
+  left_join( eggnogs, by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) ) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'A', 'RNA_process')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'B', 'Chromatin_Struc')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'C', 'Energy_prod')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'D', 'Cell_cycle')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'E', 'AA_metab')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'F', 'Nucl_metab')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'G', 'Carbohy_metab')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'H', 'Coenz_metab')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'I', 'Lipid_metab')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'J', 'Tranlsation')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'K', 'Transcription')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'L', 'Replication')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'M', 'Cell_wall')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'N', 'Cell_motility')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'O', 'Post-transl_mod')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'P', 'Inorg_ion_transp')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'Q', 'Sec_Structure')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'T', 'Signal_Transduc')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'U', 'Intracel_traf')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'Y', 'Nucl_structure')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'Z', 'Cytoskeleton')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'R', 'Gen_Func')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == 'S', 'Func_unknown')) %>%
+  mutate(COG_category = replace(COG_category, COG_category == '-', 'Func_unknown'))
+
+top13cog <- counts.eggnogs %>%
+  #filter( COG_category != '(S)Func_unknown') %>%
+  group_by(COG_category, sample) %>%
+  summarise(tpm = sum(m_tpm),  .groups = 'drop_last') %>%
+  summarise(mean_tpm = mean(tpm), .groups = 'drop') %>%
+  slice_max(mean_tpm, n = 13) %>%
+  na.omit()
+
+# top 13 expressed COG category divided by samples
+# DL: What's going on here with the two plots?
+p3 <- ( counts.eggnogs %>%
+    as_tibble() %>%
+    inner_join(top13cog, by = 'COG_category') %>%
+    group_by(run, sample, COG_category) %>%
+    summarise(tpm = sum(m_tpm)/10^5, .groups = 'drop') %>%
+    mutate(COG_category = reorder(COG_category, -tpm)) %>%
+    na.omit() %>%
+    filter( run == 'megahit.prokka.without_bbnorm') %>%
+    ggplot(aes(x = COG_category, y = tpm)) +
+    theme(
+          legend.position = 'null') +
+    scale_fill_manual(values = mst1.samples.color) +
+    geom_col(aes(fill = sample), position = 'dodge', colour = 'Black') +
+    labs(x = "", y = "TPM(x10^5)") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7)) ) +
+  ( original.fun %>%
+    as_tibble() %>%
+    group_by(sample, SEED) %>%
+    summarise(tpm = sum(tpm), .groups = 'drop') %>%
+    mutate(SEED = reorder(SEED, -tpm)) %>%
+    na.omit() %>%
+    ggplot(aes(x = SEED, y = tpm)) +
+      scale_fill_manual(values = mst1.samples.color) +
+      geom_col(aes(fill = sample), position = 'dodge', colour = 'Black') +
+      labs(y = "TPM(x10^5)", x = "") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7)) )
+
+p3 + plot_annotation(tag_levels = 'A')
+```
+
+```{r fig-mst-1-tax-annot-comparison , echo = FALSE, warning = FALSE}
+#| label: fig-mst-1-tax-annot-comparison
+#| fig.height: 6
+#| fig-cap: '**Taxonomy annotation comparison** A) GTDB database from nf-core/metatdenovo and B) taxonomy from original paper.'
+# it makes easier to compare one type of run with the original annotation. 
+# we can have as supplementary figures a plot with all the combination.
+# here I will plot megahit.prokka.without_bbnorm vs original paper
+
+# join taxonomy and counts
+counts.tax <- counts %>%
+  mutate(sample = if_else(grepl("KA1", sample), 'Lca', sample)) %>%
+  mutate(sample = if_else(grepl("KA2", sample), 'Lca', sample)) %>%
+  mutate(sample = if_else(grepl("NA1", sample), 'Hca', sample)) %>%
+  mutate(sample = if_else(grepl("NA2", sample), 'Hca', sample)) %>%
+  mutate(sample = if_else(grepl("KB1", sample), 'Lcc', sample)) %>%
+  mutate(sample = if_else(grepl("KB2", sample), 'Lcc', sample)) %>%
+  mutate(sample = if_else(grepl("NB1", sample), 'Hcc', sample)) %>%
+  mutate(sample = if_else(grepl("NB2", sample), 'Hcc', sample)) %>%
+  group_by(project, run, assembler, orf_caller, bbnorm, minlen, sample, orf) %>%
+  summarise(m_tpm = mean(tpm),
+            sd = sd(tpm), 
+            .groups = 'drop') %>%
+  left_join( eukulele, by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) ) %>%
+  filter( run == 'megahit.prokka.without_bbnorm')
+counts.tax$family[is.na(counts.tax$family)] <- 'uncl.'
+
+# calculate tpms Family level for bacteria
+# top 7 family
+top7_family <- counts.tax %>%
+  filter( family != 'uncl.') %>%
+  group_by(family) %>%
+  summarise(tpm = sum(m_tpm), .groups = 'drop') %>%
+  slice_max(tpm, n = 7) %>%
+  select(-tpm)
+  
+RANKS.family.tax = c('Schleiferiaceae', 'Flavobacteriaceae', 'Pseudohongiellaceae', 'Alteromonadaceae', 'Thalassospiraceae', 'Pelagibacteraceae', 'Rhodobacteraceae')
+matchcol.taxonomy <- c( "#962d19", "#BA5019", "#f8b53f",
+                                   "#bae53f", "#4e3484", "#4e4e84", "#675084")
+RANKS.original.tax = c("Other Flavobacteria", "Flavobacteriaceae", "Other Gammaproteobacteria", "Alteromonadaceae", "Other Alphaproteobacteria", "SAR11 clade", "Rhodobacteraceae")
+
+matchingcolors.original.tax <- c("#952720", "#BA5019", "#F8E53F",
+                                 "#bae53f", "#113484", "#115084","#675084")
+# Schleiferiaceae     = #962d19
+# Flavobacteriaceae   = #BA5019
+# Pseudohongiellaceae = #f8b53f
+# Alteromonadaceae    = #bae53f
+# Thalassospiraceae   = #4e3484
+# Pelagibacteraceae   = #4e4e84
+# Rhodobacteraceae    = #675084
+
+p4 <- ( counts.tax %>%
+  inner_join(top7_family, by = "family") %>%
+  group_by(sample, family) %>%
+  summarise(sum_tpm = sum(m_tpm)/10^5, .groups = 'drop') %>%
+  ggplot(aes(x = sample, y = sum_tpm, fill = factor(family, levels = RANKS.family.tax))) +
+  scale_fill_manual(values = matchcol.taxonomy) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) +
+  ylab("Transcripts per million") +
+  scale_y_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
+  geom_col(width= .70, colour="black") +
+  labs(x = NULL, fill = "Family", y ="TPM (x10^5)") ) +
+  ( original.tax %>%
+    ggplot(aes(x = sample, y = tpm, fill = factor(family, levels = RANKS.original.tax))) +
+    scale_fill_manual(values = matchingcolors.original.tax) +
+    scale_y_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) +
+    geom_col(width= .70, colour="black") +
+    ylab("Transcripts per million") +
+    labs(fill = "Family", y = "TPM (x10^5)", x = NULL)
+  )
+
+p4 + plot_annotation(tag_levels = 'A')
+```
+
+```{r fig-edgeR-analysis , echo = FALSE, warning = FALSE}
+#| label: fig-mst-1-edgerR-analysis
+#| fig.height: 6
+#| fig-cap: '**Edger output** A) eggnogs that have differencial expression according to EdgeR output'
+deg <- edger %>%
+  filter(PValue < 0.01) %>%
+  filter(logFC > 1.5) %>%
+  filter(contrast == 'KA-KB') %>%
+  inner_join((eggnogs.edger %>%
+               select(-orf) %>%
+               distinct()) %>%
+               filter( taxon == '1|root'), by = 'eggnog') %>%
+  #filter( cog_category != '-' ) %>%
+  #filter(!grepl("^2", eggnog)) %>%
+  group_by(eggnog) %>%
+  mutate(rank = row_number()) %>%
+  ungroup() %>%
+  filter( rank == 1) %>%
+  inner_join(eggnogs.edger[,c(1,2)], by = 'eggnog' ) %>%
+  inner_join(counts %>% filter( sample == 'KA1' | sample == 'KA2' |
+                                  sample == 'KB1' | sample == 'KB2'), by = 'orf') %>%
+  mutate(sample = if_else(grepl("KA1", sample), 'KA', sample)) %>%
+  mutate(sample = if_else(grepl("KA2", sample), 'KA', sample)) %>%
+  mutate(sample = if_else(grepl("KB1", sample), 'KB', sample)) %>%
+  mutate(sample = if_else(grepl("KB2", sample), 'KB', sample)) %>%
+  group_by(sample, eggnog, logFC) %>%
+  summarise(m_tpm = mean(tpm), .groups = 'drop') %>%
+  ggplot(aes(x=eggnog)) +
+  geom_col(aes(y=log(m_tpm), fill = sample),
+           position = 'dodge',
+           colour = 'Black') +
+        geom_point(aes(y=logFC)) +
+        theme_minimal() +
+  scale_y_continuous(
+    name = "log(TPM)",
+    sec.axis = sec_axis(~ ., name = "logFC")
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10))
+
+deg
 ```
 
 # Discussion
