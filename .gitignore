@@ -73,3 +73,4 @@ kofam
 *.html
 results
 seqtk
+.DS_Store
