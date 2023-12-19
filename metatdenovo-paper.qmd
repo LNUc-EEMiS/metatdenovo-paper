@@ -20,7 +20,7 @@ bibliography:
 #| echo: false
 #| cache: false
 
-knitr::opts_chunk$set(echo = TRUE, fig.path='figures/', cache = FALSE, fig.width = 10)
+knitr::opts_chunk$set(echo = TRUE, fig.path='figures/', cache = TRUE, fig.width = 10)
 ggplot2::theme_set(ggplot2::theme_bw())
 ```
 
@@ -55,6 +55,8 @@ mst1.samples.color <- c("#ea3a25", "#f09536", "#1a43f5", "#74fafd")
 
 ```{r read-execution-traces}
 #| label: read-data
+#| cache-lazy: false
+
 extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
   read_tsv(show_col_types = FALSE, id = 'fname') %>%
   mutate(
@@ -114,6 +116,8 @@ process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE)
 ```{r read-overall-stats}
 #| label: read-overall-stats
 #| warning: false
+#| cache-lazy: false
+
 overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
@@ -130,6 +134,8 @@ overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %
 ```{r read-transrate}
 #| label: read-transrate
 #| warning: false
+#| cache-lazy: false
+
 transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
   read_csv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
@@ -146,8 +152,8 @@ transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
 
 ```{r read-idxstats}
 #| label: read-idxstats
+#| cache-lazy: false
 
-#idxstats <- Sys.glob('nextflow/*/*/samtools/*.KA1.idxstats') %>%
 idxstats <- Sys.glob('nextflow/*/*/samtools/*.idxstats') %>%
   read_tsv(id = 'fname', show_col_types = FALSE, col_names = c('contig', 'length', 'n_mapped', 'n_unmapped')) %>%
   filter(contig != '*', n_mapped > 0) %>%
@@ -188,6 +194,7 @@ counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
 
 ```{r read-eukulele}
 #| label: read-eukulele
+#| cache-lazy: false
 
 eukulele <- Sys.glob('nextflow/*/*/summary_tables/*_taxonomy.tsv.gz') %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
@@ -215,8 +222,9 @@ eukulele <- Sys.glob('nextflow/*/*/summary_tables/*_taxonomy.tsv.gz') %>%
   )
 ```
 
-```{r create table for tax-annots from original paper }
+```{r tax-annots-og}
 #| label: tax-annots-og
+#| cache-lazy: false
 
 original.tax <- tibble(
   sample = c(rep("Lca",7), rep("Lcc",7), rep("Hca",7), rep("Hcc",7)),
@@ -303,6 +311,7 @@ edger <- read_tsv('tables/mst-1_megahit.prokka.without_bbnorm.edger.tsv.gz', sho
 
 ```{r func-annots}
 #| label: func-annots
+#| cache-lazy: false
 
 func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = 'eggnog') %>% distinct() %>%
   union(
@@ -316,17 +325,9 @@ func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = '
   unite(combination, c(eggnog, kofam, prokka), sep = '+', na.rm = TRUE)
 ```
 
-```{r toporfs}
-toporfs <- counts %>%
-  filter(count >= 5) %>%
-  group_by(project, run, assembly, assembler, orf_caller, bbnorm, minlen, orf) %>%
-  summarise(max_tpm = max(tpm), n_samples = n(), .groups = 'drop') %>%
-  filter(max_tpm > 1e5) %>%
-  arrange(desc(max_tpm))
-```
-
 ```{r func-annots-og}
 #| label: func-annots-og
+#| cache-lazy: false
 
 original.fun <- tibble(
   sample = c(rep("Lca",13), rep("Lcc",13), rep("Hca",13), rep("Hcc",13)),
@@ -645,9 +646,10 @@ p0 / p1 +
 ### Functional annotation - comparison with original data
 
 ```{r fig-mst-1-func-annot-comparison}
-#| label: fig-mst-1-annot-comparison
+#| label: fig-mst-1-func-annot-comparison
 #| fig.height: 6
 #| fig-cap: '**Annotation comparison** A) Eggnogs COG category and B) SEED category from original paper.'
+#| cache-lazy: false
 
 # it makes easier to compare one type of run with the original function annotation. 
 # we can have as supplementary figures a plot with all the combination.
@@ -733,10 +735,13 @@ p3 <- ( counts.eggnogs %>%
 p3 + plot_annotation(tag_levels = 'A')
 ```
 
-```{r fig-mst-1-tax-annot-comparison , echo = FALSE, warning = FALSE}
+```{r fig-mst-1-tax-annot-comparison}
 #| label: fig-mst-1-tax-annot-comparison
+#| warning: false
 #| fig.height: 6
 #| fig-cap: '**Taxonomy annotation comparison** A) GTDB database from nf-core/metatdenovo and B) taxonomy from original paper.'
+#| cache-lazy: false
+
 # it makes easier to compare one type of run with the original annotation. 
 # we can have as supplementary figures a plot with all the combination.
 # here I will plot megahit.prokka.without_bbnorm vs original paper
@@ -807,10 +812,13 @@ p4 <- ( counts.tax %>%
 p4 + plot_annotation(tag_levels = 'A')
 ```
 
-```{r fig-edgeR-analysis , echo = FALSE, warning = FALSE}
+```{r fig-edgeR-analysis}
 #| label: fig-mst-1-edgerR-analysis
+#| warning: false
 #| fig.height: 6
 #| fig-cap: '**Edger output** A) eggnogs that have differencial expression according to EdgeR output'
+#| cache-lazy: false
+
 deg <- edger %>%
   filter(PValue < 0.01) %>%
   filter(logFC > 1.5) %>%
