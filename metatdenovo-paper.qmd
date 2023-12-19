@@ -75,6 +75,9 @@ extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
       ifelse(str_detect(., '\\dm'), ., str_c('0m', ., sep = ' ')) %>%
       ifelse(str_detect(., '\\ds'), ., str_c(., '0s', sep = ' ')) %>%
       hms(),
+    num_cpus   = ( str_remove(`%cpu`, '%') %>%
+      as.double()/100 ) %>%
+      ceiling(),
     peak_rssc = case_when(
       str_detect(peak_rss, 'GB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^3,
       str_detect(peak_rss, 'MB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^2,
@@ -369,6 +372,15 @@ cite_packages(output = "table", pkgs = "Session", out.dir = getwd()) %>%
 
 See (@fig-extraces & @tbl-assembly-stats).
 
+* Main difference in time taken is the ORF-caller: Prokka is much slower
+* Assembly time not very different between Megahit 
+(mean: `r extraces %>% filter(process == 'MEGAHIT_INTERLEAVED') %>% summarise(m = mean(realtimec * num_cpus)) %>% pull(m)` seconds)
+and RNASpades
+(mean: `r extraces %>% filter(process == 'SPADES') %>% summarise(m = mean(realtimec * num_cpus)) %>% pull(m)` seconds).
+* Memory consumption for RNASpades ~4 times higher than for Megahit.
+* Assembly size at least twice larger for RNASpades than for Megahit.
+* The proportion mapping back does not differ as much, suggesting that many of the extra contigs from RNASpades are rare.
+
 ```{r fig-extraces}
 #| label: fig-extraces
 #| fig-height: 5
@@ -378,7 +390,7 @@ p0 <- extraces %>%
   filter(project == 'mst-1', minlen == 0) %>%
   left_join(process_groups, by = join_by(process)) %>%
   group_by(process_group, run) %>%
-  summarise(realtimec = sum(realtimec), .groups = 'drop') %>%
+  summarise(realtimec = sum(realtimec * num_cpus), .groups = 'drop') %>%
   ggplot(aes(x = run, y = realtimec, fill = process_group)) +
   geom_col() +
   scale_fill_brewer('Process group', palette = 'Paired') +
