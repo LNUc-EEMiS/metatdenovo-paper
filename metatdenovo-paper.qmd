@@ -655,7 +655,7 @@ p0 / p1 +
   plot_annotation(tag_levels = 'A')
 ```
 
-### Functional annotation - comparison with original data
+### Functional and Taxonomical annotation - comparison with original data
 
 ```{r fig-mst-1-func-annot-comparison}
 #| label: fig-mst-1-func-annot-comparison
@@ -743,15 +743,106 @@ p3 <- ( counts.eggnogs %>%
       geom_col(aes(fill = sample), position = 'dodge', colour = 'Black') +
       labs(y = "TPM(x10^5)", x = "") +
       theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7)) )
+```
 
-p3 + plot_annotation(tag_levels = 'A')
+```{r mst rnaspades prodigal - functional annotation table - selected genes, echo = FALSE, warning = FALSE}
+# check the same genes that are DE in MST paper
+# nqrB atpC ccoN nqrE pet (there are severals type), ccmC, sdhd, coxN, mxaF, rhodopsin (change in prd), psaC, psbC, actP, secD, secE, multidrug transport system (change in mtsp), dicarboxylate transport system (change in ttdt), PFAM Sodium sulphate symporter (change in str), dctM (in pfam), nucleoside transporter (change in nucT), pyrophosphate-specific outer membrane porin (change in oprO)
+
+# create the dataframe
+# rename those values in the column that are not correct
+counts.eggnogs.selectedgenes <- counts.eggnogs %>% 
+  mutate(Preferred_name = recode( Preferred_name, "pet.*"= "pet")) %>%
+  mutate(Preferred_name = if_else(grepl("DctM.*", PFAMs), "dctM", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*Bacteriorhodopsin*", Description), "prd", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("PFAM Sodium sulphate symporter", Description), "str", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*dicarboxylate transport system*", Description), "ttdt", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*nucleoside transporter*", Description), "nucT", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*pyrophosphate-specific outer membrane porin*", Description), "oprO", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*multidrug transport system*", Description), "mtsp", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*Zn-dependent protease with chaperone function*", Description), "pcf", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*PQQ-like domain*", Description), "mxaF", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*Low-potential electron donor to a number of redox enzymes*", Description), "fld", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*tail specific protease*", Description), "cpt", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*Belongs to the peptidase S41A family*", Description), "ctp", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*Peptidase, S41 family*", Description), "ctp", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*chemotaxis, protein*", Description), "ctp", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*rbc*", Preferred_name), "rbc", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*Molybdopterin oxidoreductase Fe4S4 domain*", Description), "mor", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*Flagellar regulatory protein FleQ*", Description), "fleq", Preferred_name)) %>%
+  mutate(Preferred_name = if_else(grepl("*Haemolysin-type calcium-binding repeat (2 copies)*", Description), "hcbr", Preferred_name)) %>%
+  as_tibble() %>%
+  group_by(sample, Preferred_name) %>%
+  summarise(tpm = sum(m_tpm), .groups = 'drop') %>%
+  na.omit() %>%
+  filter( sample %in% c("Lca", "Lcc")) %>%
+  filter( Preferred_name %in% c("atpC", "nqrB", "ccoN", "nqrE", "ccmC", "sdhD", "coxN", "mxaF", "pet", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr") )
+
+# create the order for the x-axis as the same as in the original paper
+counts.eggnogs.selectedgenes$Preferred_name <- factor(counts.eggnogs.selectedgenes$Preferred_name, levels = c("nqrB", "atpC", "ccoN", "nqrE", "pet", "ccmC", "sdhD", "coxN", "mxaF", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr"))
+
+setcol <- c( "red", "dark green")
+# plot the result
+p5 <- counts.eggnogs.selectedgenes %>%
+  filter( Preferred_name != "str") %>%
+  ggplot(aes(x = Preferred_name, y = tpm, fill = sample )) +
+  geom_col(position = "dodge", color = "black") +
+  scale_fill_manual(values = setcol) +
+  scale_y_log10(limits = c(1, 1e6)) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10)) +
+  theme(legend.position = 'none') +
+  labs(x = "", y = "tpm")
+```
+
+```{r fig-edgeR-analysis}
+#| label: fig-mst-1-edgerR-analysis
+#| warning: false
+#| fig.height: 6
+#| fig-cap: '**Edger output** A) eggnogs that have differencial expression according to EdgeR output'
+#| cache-lazy: false
+
+p6 <- edger %>%
+  filter(PValue < 0.01) %>%
+  filter(logFC > 1.5) %>%
+  filter(contrast == 'KA-KB') %>%
+  inner_join((eggnogs.edger %>%
+               select(-orf) %>%
+               distinct()) %>%
+               filter( taxon == '1|root'), by = 'eggnog') %>%
+  #filter( cog_category != '-' ) %>%
+  #filter(!grepl("^2", eggnog)) %>%
+  group_by(eggnog) %>%
+  mutate(rank = row_number()) %>%
+  ungroup() %>%
+  filter( rank == 1) %>%
+  inner_join(eggnogs.edger[,c(1,2)], by = 'eggnog' ) %>%
+  inner_join(counts %>% filter( sample == 'KA1' | sample == 'KA2' |
+                                  sample == 'KB1' | sample == 'KB2'), by = 'orf') %>%
+  mutate(sample = if_else(grepl("KA1", sample), 'KA', sample)) %>%
+  mutate(sample = if_else(grepl("KA2", sample), 'KA', sample)) %>%
+  mutate(sample = if_else(grepl("KB1", sample), 'KB', sample)) %>%
+  mutate(sample = if_else(grepl("KB2", sample), 'KB', sample)) %>%
+  group_by(sample, eggnog, logFC) %>%
+  summarise(m_tpm = mean(tpm), .groups = 'drop') %>%
+  ggplot(aes(x=eggnog)) +
+  scale_fill_manual(values = setcol) +
+  geom_col(aes(y=log(m_tpm), fill = sample),
+           position = 'dodge',
+           colour = 'Black') +
+        geom_point(aes(y=logFC)) +
+        theme_minimal() +
+  scale_y_continuous(
+    name = "log(TPM)",
+    sec.axis = sec_axis(~ ., name = "logFC")
+  ) +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6))
 ```
 
 ```{r fig-mst-1-tax-annot-comparison}
 #| label: fig-mst-1-tax-annot-comparison
 #| warning: false
-#| fig.height: 6
-#| fig-cap: '**Taxonomy annotation comparison** A) GTDB database from nf-core/metatdenovo and B) taxonomy from original paper.'
+#| fig.height: 10
+#| fig-cap: '**Funcional and taxonomical annotation comparison** A) Eggnogs COG category and B) SEED category from original paper. C) Genes found with nf-core/metatdenovo and original paper. D) eggnogs that have differencial expression according to EdgeR output. E) GTDB database from nf-core/metatdenovo and F) taxonomy from original paper.'
 #| cache-lazy: false
 
 # it makes easier to compare one type of run with the original annotation. 
@@ -800,13 +891,14 @@ matchingcolors.original.tax <- c("#952720", "#BA5019", "#F8E53F",
 # Pelagibacteraceae   = #4e4e84
 # Rhodobacteraceae    = #675084
 
-p4 <- ( counts.tax %>%
+p7 <- ( counts.tax %>%
   inner_join(top7_family, by = "family") %>%
   group_by(sample, family) %>%
   summarise(sum_tpm = sum(m_tpm)/10^5, .groups = 'drop') %>%
   ggplot(aes(x = sample, y = sum_tpm, fill = factor(family, levels = RANKS.family.tax))) +
   scale_fill_manual(values = matchcol.taxonomy) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+        legend.position = 'none') +
   ylab("Transcripts per million") +
   scale_y_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
   geom_col(width= .70, colour="black") +
@@ -815,58 +907,15 @@ p4 <- ( counts.tax %>%
     ggplot(aes(x = sample, y = tpm, fill = factor(family, levels = RANKS.original.tax))) +
     scale_fill_manual(values = matchingcolors.original.tax) +
     scale_y_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10)) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+          legend.key.width = unit(0.5, "cm"),
+        legend.key.height = unit(0.5, "cm")) +
     geom_col(width= .70, colour="black") +
     ylab("Transcripts per million") +
     labs(fill = "Family", y = "TPM (x10^5)", x = NULL)
   )
 
-p4 + plot_annotation(tag_levels = 'A')
-```
-
-```{r fig-edgeR-analysis}
-#| label: fig-mst-1-edgerR-analysis
-#| warning: false
-#| fig.height: 6
-#| fig-cap: '**Edger output** A) eggnogs that have differencial expression according to EdgeR output'
-#| cache-lazy: false
-
-deg <- edger %>%
-  filter(PValue < 0.01) %>%
-  filter(logFC > 1.5) %>%
-  filter(contrast == 'KA-KB') %>%
-  inner_join((eggnogs.edger %>%
-               select(-orf) %>%
-               distinct()) %>%
-               filter( taxon == '1|root'), by = 'eggnog') %>%
-  #filter( cog_category != '-' ) %>%
-  #filter(!grepl("^2", eggnog)) %>%
-  group_by(eggnog) %>%
-  mutate(rank = row_number()) %>%
-  ungroup() %>%
-  filter( rank == 1) %>%
-  inner_join(eggnogs.edger[,c(1,2)], by = 'eggnog' ) %>%
-  inner_join(counts %>% filter( sample == 'KA1' | sample == 'KA2' |
-                                  sample == 'KB1' | sample == 'KB2'), by = 'orf') %>%
-  mutate(sample = if_else(grepl("KA1", sample), 'KA', sample)) %>%
-  mutate(sample = if_else(grepl("KA2", sample), 'KA', sample)) %>%
-  mutate(sample = if_else(grepl("KB1", sample), 'KB', sample)) %>%
-  mutate(sample = if_else(grepl("KB2", sample), 'KB', sample)) %>%
-  group_by(sample, eggnog, logFC) %>%
-  summarise(m_tpm = mean(tpm), .groups = 'drop') %>%
-  ggplot(aes(x=eggnog)) +
-  geom_col(aes(y=log(m_tpm), fill = sample),
-           position = 'dodge',
-           colour = 'Black') +
-        geom_point(aes(y=logFC)) +
-        theme_minimal() +
-  scale_y_continuous(
-    name = "log(TPM)",
-    sec.axis = sec_axis(~ ., name = "logFC")
-  ) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10))
-
-deg
+(p3 / (p5 + p6) ) / p7 + plot_annotation(tag_levels = 'A')
 ```
 
 # Discussion
