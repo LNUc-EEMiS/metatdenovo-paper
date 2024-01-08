@@ -31,8 +31,8 @@ ggplot2::theme_set(ggplot2::theme_bw())
 #| include: false
 
 library(readr)
-library(data.table)
-library(dtplyr)
+library(forcats)
+library(tibble)
 library(dplyr, warn.conflicts = FALSE)
 library(tidyr)
 library(lubridate)
@@ -51,6 +51,22 @@ library(patchwork)
 
 TAXON_RANKS_SORTED = c('root', 'domain', 'phylum', 'class', 'order', 'family', 'genus', 'species')
 mst1.samples.color <- c("#ea3a25", "#f09536", "#1a43f5", "#74fafd")
+```
+
+```{r create-samples}
+#| label: create-samples
+
+samples <- tribble(
+  ~sample, ~treatment, ~replicate,
+  'KA1',   'control_acidified', '1',
+  'KA2',   'control_acidified', '2',
+  'KB1',   'control_nonacidified', '1',
+  'KB2',   'control_nonacidified', '2',
+  'NA1',   'nutrients_acidified', '1',
+  'NA2',   'nutrients_acidified', '2',
+  'NB1',   'nutrients_nonacidified', '1',
+  'NB2',   'nutrients_nonacidified', '2' 
+)
 ```
 
 ```{r read-execution-traces}
@@ -112,8 +128,13 @@ extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
   mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, process, sample)
+```
 
-process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE)
+```{r read-process-groups}
+#| label: read-process-groups
+
+process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE) %>%
+  mutate(process_group = factor(process_group) %>% fct_reorder(as.numeric(ordernum)) %>% fct_rev())
 ```
 
 ```{r read-overall-stats}
@@ -225,20 +246,6 @@ eukulele <- Sys.glob('nextflow/*/*/summary_tables/*_taxonomy.tsv.gz') %>%
   )
 ```
 
-```{r tax-annots-og}
-#| label: tax-annots-og
-#| cache-lazy: false
-
-original.tax <- tibble(
-  sample = c(rep("Lca",7), rep("Lcc",7), rep("Hca",7), rep("Hcc",7)),
-  family = c(rep(c("Other Flavobacteria", "Flavobacteriaceae", "Other Gammaproteobacteria", "Alteromonadaceae", "Other Alphaproteobacteria", "SAR11 clade", "Rhodobacteraceae"),4)),
-  tpm = c(0.1, 0.5, 2.3, 2.4, 0.3, 0.4, 0.1,
-          0.1, 0.5, 2.3, 2.3, 0.5, 0.2, 0.1,
-          0.3, 0.5, 2.5, 0.7, 0.4, 0.1, 0.1,
-          0.1, 0.7, 2.5, 1.7, 0.9, 0.2, 0.2)
-  )
-```
-
 ```{r read-eggnogs}
 #| label: read-eggnogs
 #| cache-lazy: false
@@ -328,6 +335,64 @@ func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = '
   unite(combination, c(eggnog, kofam, prokka), sep = '+', na.rm = TRUE)
 ```
 
+```{r hellinger-pcas}
+#| label: hellinger-pcas
+hellinger_pca <- function(ds) {
+  ds %>%
+    group_by(sample, variable) %>%
+    summarise(count = sum(count), .groups = 'drop') %>%
+    pivot_wider(names_from = variable, values_from = count, values_fill = 0) %>%
+    as.data.frame() %>%
+    column_to_rownames('sample') %>%
+    vegan::decostand(method = 'hellinger') %>%
+    vegan::rda()
+}
+pcas <- list()
+for ( r in c(
+  'megahit.prodigal.without_bbnorm', 'rnaspades.prodigal.without_bbnorm', 
+  'megahit.prokka.without_bbnorm', 'rnaspades.prokka.without_bbnorm'
+  ) 
+) {
+  pcas[[sprintf("%s-eggnogs", r)]] <- counts %>% 
+    filter(run == r) %>%
+    inner_join(
+      eggnogs %>%
+        select(project, run, eggNOG_OGs, orf) %>%
+        separate_rows(eggNOG_OGs, sep = ',') %>%
+        separate(eggNOG_OGs, c('eggnog', 'taxon'), sep = '@') %>%
+        filter(taxon == '1|root') %>%
+        select(-taxon) %>%
+        distinct(run, orf, .keep_all = TRUE),
+      by = join_by(project, run, orf)
+    ) %>%
+    rename(variable = eggnog) %>%
+    hellinger_pca()
+  pcas[[sprintf("%s-families", r)]] <- counts %>% 
+    filter(run == r) %>% 
+    inner_join(
+      eukulele %>%
+        select(project, run, orf, domain:species),
+      by = join_by(project, run, orf)
+    ) %>%
+    rename(variable = family) %>%
+    hellinger_pca()
+}
+```
+
+```{r tax-annots-og}
+#| label: tax-annots-og
+#| cache-lazy: false
+
+original.tax <- tibble(
+  sample = c(rep("Lca",7), rep("Lcc",7), rep("Hca",7), rep("Hcc",7)),
+  family = c(rep(c("Other Flavobacteria", "Flavobacteriaceae", "Other Gammaproteobacteria", "Alteromonadaceae", "Other Alphaproteobacteria", "SAR11 clade", "Rhodobacteraceae"),4)),
+  tpm = c(0.1, 0.5, 2.3, 2.4, 0.3, 0.4, 0.1,
+          0.1, 0.5, 2.3, 2.3, 0.5, 0.2, 0.1,
+          0.3, 0.5, 2.5, 0.7, 0.4, 0.1, 0.1,
+          0.1, 0.7, 2.5, 1.7, 0.9, 0.2, 0.2)
+  )
+```
+
 ```{r func-annots-og}
 #| label: func-annots-og
 #| cache-lazy: false
@@ -412,6 +477,7 @@ p1 <- extraces %>%
   scale_colour_discrete('') +
   xlab('') +
   ylab('Max. virtual memory (GB)') +
+  ylim(0, 30) +
   coord_flip() +
   theme(axis.text.y = element_text(size=12))
 
@@ -423,6 +489,7 @@ p2 <- transrates %>%
   scale_colour_discrete('') +
   xlab('') +
   ylab('Assembly size (Mbp)') +
+  ylim(0, 200) +
   coord_flip() +
   theme(axis.text.y = element_text(size=12))
 
@@ -657,6 +724,54 @@ p0 / p1 +
 
 ### Functional and Taxonomical annotation - comparison with original data
 
+```{r fig-mst-1-family-pcas}
+#| label: fig-mst-1-family-pcas
+#| fig-cap: '**MST-1 PCAs based on data summed at family.**'
+#| include: false
+
+plot_pca <- function(pca, t) {
+  e <- pca$eig
+  
+  pca$u %>%
+    as.data.frame() %>%
+    rownames_to_column('sample') %>%
+    inner_join(samples, by = join_by(sample)) %>%
+    ggplot(aes(x = PC1, y = PC2, colour = treatment, shape = replicate)) +
+    geom_point() +
+    #scale_colour_brewer('Sample', palette = 'Paired') +
+    xlab(sprintf("PC1 (%2.1f%%)", pca$eig[['PC1']]/sum(pca$eig) * 100)) +
+    ylab(sprintf("PC2 (%2.1f%%)", pca$eig[['PC2']]/sum(pca$eig) * 100)) +
+    ggtitle(t)
+}
+
+p0 <- pcas[['megahit.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
+p1 <- pcas[['megahit.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
+p2 <- pcas[['rnaspades.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prokka')
+p3 <- pcas[['rnaspades.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prodigal')
+
+( p0 + p1 ) /
+  ( p2 + p3 ) +
+  plot_layout(guides = 'collect')
+```
+
+```{r mst-1-eggnog-pcas}
+#| label: mst-1-eggnog-pcas
+#| fig-cap: '**MST-1 PCAs based on data summed at the root EGGNOG.**'
+#| include: false
+
+p0 <- pcas[['megahit.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
+p1 <- pcas[['megahit.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
+p2 <- pcas[['rnaspades.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prokka')
+p3 <- pcas[['rnaspades.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prodigal')
+
+( p0 + p1 ) /
+  ( p2 + p3 ) +
+  plot_layout(guides = 'collect')
+```
+
+
+### Functional annotation - comparison with original data
+
 ```{r fig-mst-1-func-annot-comparison}
 #| label: fig-mst-1-func-annot-comparison
 #| fig.height: 6
@@ -716,7 +831,6 @@ top13cog <- counts.eggnogs %>%
   na.omit()
 
 # top 13 expressed COG category divided by samples
-# DL: What's going on here with the two plots?
 p3 <- ( counts.eggnogs %>%
     as_tibble() %>%
     inner_join(top13cog, by = 'COG_category') %>%
