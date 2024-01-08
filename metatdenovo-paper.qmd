@@ -455,9 +455,11 @@ and RNASpades
 p0 <- extraces %>%
   filter(project == 'mst-1', minlen == 0) %>%
   left_join(process_groups, by = join_by(process)) %>%
-  group_by(process_group, run) %>%
+  arrange(assembly, bbnorm, orf_caller) %>%
+  mutate(name = sprintf("%s: %s", assembly, orf_caller) %>% factor() %>% fct_inorder() %>% fct_rev()) %>%
+  group_by(process_group, name) %>%
   summarise(realtimec = sum(realtimec * num_cpus), .groups = 'drop') %>%
-  ggplot(aes(x = run, y = realtimec, fill = process_group)) +
+  ggplot(aes(x = name, y = realtimec, fill = process_group)) +
   geom_col() +
   scale_fill_brewer('Process group', palette = 'Paired') +
   xlab('') + ylab('Seconds') +
@@ -468,6 +470,7 @@ p1 <- extraces %>%
   filter(project == 'mst-1', minlen == 0) %>%
   left_join(process_groups, by = join_by(process)) %>%
   filter(process_group == 'assembly') %>%
+  mutate(assembler = factor(assembler) %>% fct_inorder() %>% fct_rev()) %>%
   group_by(run) %>%
   filter(peak_vmemc == max(peak_vmemc)) %>%
   ungroup() %>%
@@ -485,6 +488,7 @@ p1 <- extraces %>%
 p2 <- transrates %>%
   filter(project == 'mst-1', minlen == 0) %>%
   mutate(mbp = n_bases/1000^2 %>% round()) %>%
+  mutate(assembler = factor(assembler) %>% fct_inorder() %>% fct_rev()) %>%
   ggplot(aes(x = assembler, y = mbp, colour = bbnorm)) +
   geom_point() +
   scale_colour_discrete('') +
@@ -538,7 +542,7 @@ See (@fig-orf-calling).
 ```{r fig-orf-calling}
 #| label: fig-orf-calling
 #| fig-height: 10
-#| fig-cap: '**ORF calling statistics.** A) Rank-abundance curves per ORF with number of samples each ORF occurs in in colour. B) Counts per sample. *) The assembly was made from read-depth-normalized data. †) Contigs shorter than 200 nucleotides were removed before ORF calling.'
+#| fig-cap: '**ORF calling statistics.** A) Rank-abundance curves per ORF with number of samples each ORF occurs in in colour. B) Counts per sample. C) Length distributions of ORFs for the four assemblies using Prodigal or Prokka. *) The assembly was made from read-depth-normalized data. †) Contigs shorter than 200 nucleotides were removed before ORF calling.'
 
 plot_rank_abundance <- function(ds) {
   ds %>%
@@ -562,6 +566,8 @@ p0 <- counts %>%
   filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
   group_by(run, assembly, assembler, orf_caller, bbnorm, orf) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop_last') %>%
+  arrange(assembler, bbnorm) %>%
+  mutate(assembly = factor(assembly) %>% fct_inorder() %>% fct_rev()) %>%
   mutate(cr = rank(desc(count), ties.method = 'first'), tpmr = rank(desc(tpm), ties.method = 'first')) %>%
   ungroup() %>%
   plot_rank_abundance()
@@ -569,7 +575,8 @@ p0 <- counts %>%
 p1 <- counts %>%
   filter(project == 'mst-1') %>%
   filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
-  mutate(assembly_orfc = sprintf("%s %s", assembly, orf_caller)) %>%
+  arrange(assembly, bbnorm, orf_caller) %>%
+  mutate(assembly_orfc = sprintf("%s: %s", assembly, orf_caller) %>% factor() %>% fct_inorder()) %>%
   group_by(assembly_orfc, sample) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop') %>%
   ggplot(aes(x = sample, y = count, fill = sample)) +
@@ -597,7 +604,7 @@ p2 <- counts %>%
   coord_flip()
 
 ( p0 + p1 ) / p2 +
-  plot_layout(widths = c(3, 2), heights = c(7,2)) +
+  plot_layout(widths = c(3, 2), heights = c(7,3)) +
   plot_annotation(tag_levels = 'A')
 ```
 
@@ -623,11 +630,13 @@ p0 <- eukulele %>%
   summarise(`N. ORFs` = n(), count = sum(count), tpm = sum(tpm), .groups = 'drop') %>%
   pivot_longer(`N. ORFs`:tpm, names_to = 'var', values_to = 'value') %>%
   mutate(var = factor(var, levels = c('N. ORFs', 'count', 'tpm'), ordered = TRUE)) %>%
-  mutate(name = sprintf("%s: %s", orf_caller, var)) %>%
-  ggplot(aes(assembly, value, fill = taxon_rank)) +
+  mutate(name = sprintf("%s: %s", assembly, orf_caller)) %>%
+  arrange(assembler, bbnorm, orf_caller) %>%
+  mutate(name = factor(name) %>% fct_inorder() %>% fct_rev()) %>%
+  ggplot(aes(name, value, fill = taxon_rank)) +
   geom_col() +
   scale_fill_brewer('Rank', palette = 'Set1') +
-  facet_wrap(~name, scales = 'free_x') +
+  facet_wrap(~var, scales = 'free_x') +
   xlab('') + ylab('') +
   coord_flip() +
   theme(
@@ -647,11 +656,13 @@ p1 <- func_annots %>%
   summarise(`N. ORFs` = n(), count = sum(count), tpm = sum(tpm), .groups = 'drop') %>%
   pivot_longer(`N. ORFs`:tpm, names_to = 'var', values_to = 'value') %>%
   mutate(var = factor(var, levels = c('N. ORFs', 'count', 'tpm'), ordered = TRUE)) %>%
-  mutate(name = sprintf("%s: %s", orf_caller, var)) %>%
-  ggplot(aes(assembly, value, fill = combination)) +
+  mutate(name = sprintf("%s: %s", assembly, orf_caller)) %>%
+  arrange(assembler, bbnorm, orf_caller) %>%
+  mutate(name = factor(name) %>% fct_inorder() %>% fct_rev()) %>%
+  ggplot(aes(name, value, fill = combination)) +
   geom_col() +
   scale_fill_brewer('Annotation tools', palette = 'Set2') +
-  facet_wrap(~ name, scales = 'free_x') +
+  facet_wrap(~ var, scales = 'free_x') +
   xlab('') + ylab('') +
   coord_flip() +
   theme(
@@ -666,6 +677,8 @@ p0 / p1 +
 
 * Extreme abundances for contigs and ORFs
 * Not seen in any other sample
+
+* Some of the long, abundant contigs from *Staphylococcus cohnii* and *S. haemolyticus* -- unlikely marine bacteria
 
 ```{r fig-na2-rank-abundance}
 #| label: fig-na2-rank-abundance
