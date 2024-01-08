@@ -1,42 +1,42 @@
-process	process_group	ncpus
-BBMAP_ALIGN	quantify	6
-BBMAP_BBDUK	bbduk	6
-BBMAP_BBNORM	bbnorm	6
-BBMAP_INDEX	quantify	1
-COLLECT_FEATURECOUNTS	quantify	12
-COLLECT_STATS	summary	2
-CUSTOM_DUMPSOFTWAREVERSIONS	other	1
-EGGNOG_MAPPER	eggnog-annot	6
-EGGNOG_SUM	eggnog-annot	2
-EUKULELE_SEARCH	eukulele-annot	12
-FAA_CAT	orf-calling	2
-FASTQC	qc	6
-FEATURECOUNTS_CDS	quantify	6
-FFN_CAT	orf-calling	2
-FORMAT_PRODIGAL_GFF	orf-calling	2
-FORMATSPADES	assembly	2
-FORMAT_TAX	summary	2
-GFF_CAT	orf-calling	2
-KOFAMSCAN_DOWNLOAD	other	1
-KOFAMSCAN_SCAN	kofam-annot	6
-MEGAHIT_INTERLEAVED	assembly	12
-MERGE_TABLES	summary	2
-MULTIQC	summary	1
-PRODIGAL_MODULE	orf-calling	1
-PROKKAGFF2TSV	orf-calling	6
-PROKKA	orf-calling	2
-SAMPLESHEET_CHECK	other	1
-SAMTOOLS_FLAGSTAT	quantify	1
-SAMTOOLS_IDXSTATS	quantify	1
-SAMTOOLS_INDEX	quantify	2
-SAMTOOLS_SORT	quantify	6
-SAMTOOLS_STATS	quantify	1
-SEQTK_MERGEPE	assembly	1
-SPADES	assembly	12
-SUM_KOFAMSCAN	kofam-annot	2
-SUM_TAXONOMY	eukulele-annot	2
-TRANSRATE	summary	2
-TRIMGALORE	qc	12
-UNPIGZ_CONTIGS	other	2
-UNPIGZ_GFF	other	2
-WRITESPADESYAML	assembly	1
+process	process_group	ncpus	ordernum
+BBMAP_ALIGN	quantification	6	060
+BBMAP_BBDUK	contaminant-removal	6	020
+BBMAP_BBNORM	read-depth norm.	6	030
+BBMAP_INDEX	quantification	1	060
+COLLECT_FEATURECOUNTS	quantification	12	060
+COLLECT_STATS	summary	2	110
+CUSTOM_DUMPSOFTWAREVERSIONS	other	1	100
+EGGNOG_MAPPER	eggnog annot.	6	080
+EGGNOG_SUM	eggnog annot.	2	080
+EUKULELE_SEARCH	taxon. annot.	12	070
+FAA_CAT	orf-calling	2	050
+FASTQC	qc	6	010
+FEATURECOUNTS_CDS	quantification	6	060
+FFN_CAT	orf-calling	2	050
+FORMAT_PRODIGAL_GFF	orf-calling	2	050
+FORMATSPADES	assembly	2	040
+FORMAT_TAX	summary	2	110
+GFF_CAT	orf-calling	2	050
+KOFAMSCAN_DOWNLOAD	other	1	100
+KOFAMSCAN_SCAN	kofam annot.	6	090
+MEGAHIT_INTERLEAVED	assembly	12	040
+MERGE_TABLES	summary	2	110
+MULTIQC	summary	1	110
+PRODIGAL_MODULE	orf-calling	1	050
+PROKKAGFF2TSV	orf-calling	6	050
+PROKKA	orf-calling	2	050
+SAMPLESHEET_CHECK	other	1	100
+SAMTOOLS_FLAGSTAT	quantification	1	060
+SAMTOOLS_IDXSTATS	quantification	1	060
+SAMTOOLS_INDEX	quantification	2	060
+SAMTOOLS_SORT	quantification	6	060
+SAMTOOLS_STATS	quantification	1	060
+SEQTK_MERGEPE	assembly	1	040
+SPADES	assembly	12	040
+SUM_KOFAMSCAN	kofam annot.	2	090
+SUM_TAXONOMY	taxon. annot.	2	070
+TRANSRATE	summary	2	110
+TRIMGALORE	qc	12	010
+UNPIGZ_CONTIGS	other	2	100
+UNPIGZ_GFF	other	2	100
+WRITESPADESYAML	assembly	1	040
