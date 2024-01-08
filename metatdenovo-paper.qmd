@@ -260,6 +260,7 @@ eggnogs <- Sys.glob('nextflow/*/*/summary_tables/*.emapper.tsv.gz') %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
   mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  rename_with(str_to_lower) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
 
 eggnogs.edger <- read_tsv(
@@ -350,16 +351,16 @@ hellinger_pca <- function(ds) {
 pcas <- list()
 for ( r in c(
   'megahit.prodigal.without_bbnorm', 'rnaspades.prodigal.without_bbnorm', 
-  'megahit.prokka.without_bbnorm', 'rnaspades.prokka.without_bbnorm'
+  'megahit.prokka.without_bbnorm',   'rnaspades.prokka.without_bbnorm'
   ) 
 ) {
   pcas[[sprintf("%s-eggnogs", r)]] <- counts %>% 
     filter(run == r) %>%
     inner_join(
       eggnogs %>%
-        select(project, run, eggNOG_OGs, orf) %>%
-        separate_rows(eggNOG_OGs, sep = ',') %>%
-        separate(eggNOG_OGs, c('eggnog', 'taxon'), sep = '@') %>%
+        select(project, run, eggnog_ogs, orf) %>%
+        separate_rows(eggnog_ogs, sep = ',') %>%
+        separate(eggnog_ogs, c('eggnog', 'taxon'), sep = '@') %>%
         filter(taxon == '1|root') %>%
         select(-taxon) %>%
         distinct(run, orf, .keep_all = TRUE),
