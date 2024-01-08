@@ -501,10 +501,11 @@ p0 / ( p1 + p2 ) +
 
 ```{r tbl-assembly-stats}
 #| label: tbl-assembly-stats
-#| tbl-cap: '**Overall statistics for MST-1 assemblies.** *) The assembly was made from read-normalized data. †) Contigs shorter than 200 nucleotides were removed.'
+#| tbl-cap: '**Overall statistics for MST-1 assemblies.** *) The assembly was made from read-normalized data. †) Contigs shorter than 200 nucleotides were removed using the --min_contig_length parameter.'
 
 transrates %>%
   filter(project == 'mst-1') %>%
+  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
   inner_join(
     overall_stats %>% 
       transmute(project, assembler, bbnorm, minlen, sample, prop_mapped = idxs_n_mapped/n_non_contaminated) %>%
@@ -513,13 +514,13 @@ transrates %>%
       summarise(mean_prop_mapped = mean(prop_mapped), .groups = 'drop'),
     by = join_by(project, assembler, bbnorm, minlen)
   ) %>%
+  arrange(assembler, bbnorm) %>%
   transmute(
     Assembly = assembly,
     `N. contigs` = n_seqs, `Size (Mbp)` = round(n_bases/1000^2, digits = 1),
     `Lengths` = sprintf("%d-%d", smallest, largest), `Mean length (bp)` = round(mean_len), N50 = n50,
     `Mean prop. mapped` = sprintf("%2.1f%%", mean_prop_mapped * 100)
   ) %>%
-  arrange(Assembly) %>%
   kable()
 ```
 
@@ -558,6 +559,7 @@ plot_rank_abundance <- function(ds) {
 
 p0 <- counts %>%
   filter(project == 'mst-1') %>%
+  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
   group_by(run, assembly, assembler, orf_caller, bbnorm, orf) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop_last') %>%
   mutate(cr = rank(desc(count), ties.method = 'first'), tpmr = rank(desc(tpm), ties.method = 'first')) %>%
@@ -566,6 +568,7 @@ p0 <- counts %>%
 
 p1 <- counts %>%
   filter(project == 'mst-1') %>%
+  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
   mutate(assembly_orfc = sprintf("%s %s", assembly, orf_caller)) %>%
   group_by(assembly_orfc, sample) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop') %>%
@@ -581,10 +584,13 @@ p1 <- counts %>%
   )
 
 p2 <- counts %>%
-  filter(project == 'mst-1', minlen == 0) %>%
+  filter(project == 'mst-1') %>% #, minlen == 0) %>%
+  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
   select(project:minlen, orf, length) %>% 
   mutate(length = length * 3) %>%
   distinct() %>%
+  arrange(assembler, bbnorm) %>%
+  mutate(assembly = factor(assembly) %>% fct_inorder() %>% fct_rev()) %>%
   ggplot(aes(x = assembly, y = length, fill = orf_caller)) +
   geom_violin() +
   scale_y_log10() +
@@ -598,6 +604,68 @@ p2 <- counts %>%
 -   Large proportions of ORFs annotated at species level, particularly when weighted by count
 -   Tendency that ORFs annotated at higher ranks are rarer than species-assigned ORFs.
 -   Why are mean tpms so low with Prodigal? Could it be explained by rare ORFs, in particular singletons from NA2?
+
+```{r fig-mst-1-annot-success}
+#| label: fig-mst-1-annot-success
+#| fig.height: 7
+#| fig-cap: '**Annotation success.** A) GTDB taxonomy and B) combinations of functional annotation. Unweighted, weighted by count and tpm respectively.'
+
+p0 <- eukulele %>%
+  filter(project == 'mst-1', db == 'gtdb') %>%
+  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
+  inner_join(
+    counts %>%
+      group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
+      summarise(count = sum(count), tpm = sum(tpm), .groups = 'drop'),
+    by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf)
+  ) %>%
+  group_by(run, assembly, assembler, orf_caller, bbnorm, minlen, taxon_rank) %>%
+  summarise(`N. ORFs` = n(), count = sum(count), tpm = sum(tpm), .groups = 'drop') %>%
+  pivot_longer(`N. ORFs`:tpm, names_to = 'var', values_to = 'value') %>%
+  mutate(var = factor(var, levels = c('N. ORFs', 'count', 'tpm'), ordered = TRUE)) %>%
+  mutate(name = sprintf("%s: %s", orf_caller, var)) %>%
+  ggplot(aes(assembly, value, fill = taxon_rank)) +
+  geom_col() +
+  scale_fill_brewer('Rank', palette = 'Set1') +
+  facet_wrap(~name, scales = 'free_x') +
+  xlab('') + ylab('') +
+  coord_flip() +
+  theme(
+    axis.text.x = element_text(angle = 65, hjust = 1)
+  )
+
+p1 <- func_annots %>%
+  filter(project == 'mst-1') %>%
+  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
+  inner_join(
+    counts %>%
+      group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
+      summarise(count = sum(count), tpm = sum(tpm), .groups = 'drop'),
+    by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf)
+  ) %>%
+  group_by(run, assembly, assembler, orf_caller, bbnorm, minlen, combination) %>%
+  summarise(`N. ORFs` = n(), count = sum(count), tpm = sum(tpm), .groups = 'drop') %>%
+  pivot_longer(`N. ORFs`:tpm, names_to = 'var', values_to = 'value') %>%
+  mutate(var = factor(var, levels = c('N. ORFs', 'count', 'tpm'), ordered = TRUE)) %>%
+  mutate(name = sprintf("%s: %s", orf_caller, var)) %>%
+  ggplot(aes(assembly, value, fill = combination)) +
+  geom_col() +
+  scale_fill_brewer('Annotation tools', palette = 'Set2') +
+  facet_wrap(~ name, scales = 'free_x') +
+  xlab('') + ylab('') +
+  coord_flip() +
+  theme(
+    axis.text.x = element_text(angle = 65, hjust = 1)
+  )
+
+p0 / p1 +
+  plot_annotation(tag_levels = 'A')
+```
+
+### What's the matter with NA2?
+
+* Extreme abundances for contigs and ORFs
+* Not seen in any other sample
 
 ```{r fig-na2-rank-abundance}
 #| label: fig-na2-rank-abundance
@@ -619,11 +687,6 @@ counts %>%
   ) %>%
   plot_rank_abundance()
 ```
-
-### What's the matter with NA2?
-
-* Extreme abundances for contigs and ORFs
-* Not seen in any other sample
 
 ```{r fig-top-abundances}
 #| label: fig-top-abundances
@@ -667,59 +730,6 @@ p1 <- counts %>%
 
 p0 / p1 +
   plot_layout(heights = c(1,4), guides = 'collect') +
-  plot_annotation(tag_levels = 'A')
-```
-
-```{r fig-mst-1-annot-success}
-#| label: fig-mst-1-annot-success
-#| fig.height: 6
-#| fig-cap: '**Annotation success.** A) GTDB taxonomy and B) combinations of functional annotation. Unweighted, weighted by count and tpm respectively.'
-
-p0 <- eukulele %>%
-  filter(project == 'mst-1', db == 'gtdb') %>%
-  inner_join(
-    counts %>%
-      group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
-      summarise(count = sum(count), tpm = sum(tpm), .groups = 'drop'),
-    by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf)
-  ) %>%
-  group_by(run, assembly, assembler, orf_caller, bbnorm, minlen, taxon_rank) %>%
-  summarise(`N. ORFs` = n(), count = sum(count), tpm = sum(tpm), .groups = 'drop') %>%
-  pivot_longer(`N. ORFs`:tpm, names_to = 'var', values_to = 'value') %>%
-  mutate(var = factor(var, levels = c('N. ORFs', 'count', 'tpm'), ordered = TRUE)) %>%
-  ggplot(aes(run, value, fill = taxon_rank)) +
-  geom_col() +
-  scale_fill_brewer('Rank', palette = 'Set1') +
-  facet_wrap(~var, scales = 'free_x') +
-  xlab('') + ylab('') +
-  coord_flip() +
-  theme(
-    axis.text.x = element_text(angle = 65, hjust = 1)
-  )
-
-p1 <- func_annots %>%
-  filter(project == 'mst-1') %>%
-  inner_join(
-    counts %>%
-      group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
-      summarise(count = sum(count), tpm = sum(tpm), .groups = 'drop'),
-    by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf)
-  ) %>%
-  group_by(run, assembly, assembler, orf_caller, bbnorm, minlen, combination) %>%
-  summarise(`N. ORFs` = n(), count = sum(count), tpm = sum(tpm), .groups = 'drop') %>%
-  pivot_longer(`N. ORFs`:tpm, names_to = 'var', values_to = 'value') %>%
-  mutate(var = factor(var, levels = c('N. ORFs', 'count', 'tpm'), ordered = TRUE)) %>%
-  ggplot(aes(run, value, fill = combination)) +
-  geom_col() +
-  scale_fill_brewer('Annotation tools', palette = 'Set2') +
-  facet_wrap(~var, scales = 'free_x') +
-  xlab('') + ylab('') +
-  coord_flip() +
-  theme(
-    axis.text.x = element_text(angle = 65, hjust = 1)
-  )
-
-p0 / p1 +
   plot_annotation(tag_levels = 'A')
 ```
 
