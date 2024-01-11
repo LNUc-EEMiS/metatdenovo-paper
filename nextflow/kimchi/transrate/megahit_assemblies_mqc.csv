@@ -1,0 +1,2 @@
+assembly,n_seqs,smallest,largest,n_bases,mean_len,n_under_200,n_over_1k,n_over_10k,n_with_orf,mean_orf_percent,n90,n70,n50,n30,n10,gc,bases_n,proportion_n,score,optimal_score,cutoff,weighted
+/scratch/43940444/nxf.KTJBWrafWP/megahit_assembly.contigs.fa,17640,247,28220,16332452,925.87596,0,3666,73,8054,61.6986,378,662,1373,3042,7740,0.43011,0,0.0,NA,NA,NA,NA

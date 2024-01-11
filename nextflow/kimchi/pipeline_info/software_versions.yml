@@ -1,0 +1,85 @@
+BBMAP_ALIGN:
+  bbmap: '39.01'
+  pigz: '2.6'
+  samtools: 1.16.1
+BBMAP_BBDUK:
+  bbmap: '39.01'
+BBMAP_INDEX:
+  bbmap: '39.01'
+COLLECT_FEATURECOUNTS:
+  R: 4.2.3
+  data.table: 1.14.8
+  dplyr: 1.1.2
+  dtplyr: 1.3.1
+COLLECT_STATS:
+  R: 4.2.3
+  data.table: 1.14.8
+  dplyr: 1.1.2
+  dtplyr: 1.3.1
+  purrr: 1.0.1
+  readr: 2.1.4
+  stringr: 1.5.0
+  tidyr: 1.3.0
+CUSTOM_DUMPSOFTWAREVERSIONS:
+  python: 3.12.0
+  yaml: 6.0.1
+EGGNOG_MAPPER:
+  eggnog: 2.1.9
+EGGNOG_SUM:
+  R: 4.2.3
+  data.table: 1.14.8
+  dplyr: 1.1.2
+  dtplyr: 1.3.1
+  purrr: 1.0.1
+  readr: 2.1.4
+  stringr: 1.5.0
+  tidyr: 1.3.0
+EUKULELE_SEARCH:
+  eukulele: Matplotlib created a temporary config/cache directory at /scratch/43947710/matplotlib-nynfhn2r
+    because the default path (/home/danil/.config/matplotlib) is not a writable directory;
+    it is highly recommended to set the MPLCONFIGDIR environment variable to a writable
+    directory, in particular to speed up the import of Matplotlib and to better support
+    multiprocessing.   2.0.7
+FAA_CAT:
+  pigz: 2.3.4
+FASTQC:
+  fastqc: 0.12.1
+FEATURECOUNTS_CDS:
+  subread: 2.0.1
+FFN_CAT:
+  pigz: 2.3.4
+GFF_CAT:
+  pigz: 2.3.4
+MEGAHIT_INTERLEAVED:
+  megahit_interleaved: 1.2.9
+PROKKA:
+  prokka: 1.14.6
+PROKKAGFF2TSV:
+  R: 4.2.3
+  data.table: 1.14.8
+  dplyr: 1.1.2
+  dtplyr: 1.3.1
+  readr: 2.1.4
+  tidyr: 1.3.0
+SAMPLESHEET_CHECK:
+  python: 3.8.3
+SAMTOOLS_FLAGSTAT:
+  samtools: '1.18'
+SAMTOOLS_IDXSTATS:
+  samtools: '1.18'
+SAMTOOLS_INDEX:
+  samtools: '1.18'
+SAMTOOLS_SORT:
+  samtools: '1.18'
+SAMTOOLS_STATS:
+  samtools: '1.18'
+TRANSRATE:
+  transrate: 1.0.3
+TRIMGALORE:
+  cutadapt: '3.4'
+  trimgalore: 0.6.7
+UNPIGZ_CONTIGS:
+  pigz: 2.3.4
+Workflow:
+  Nextflow: 23.10.0
+  nf-core/metatdenovo: 1.0.0

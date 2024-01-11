@@ -1,0 +1,6 @@
+sample,single_end,fastq_1,fastq_2
+SRR443366_T1,True,samples/SRR443366_pass_101_S5_L002_R1_001.fastq.gz,
+SRR443367_T1,True,samples/SRR443367_pass_101_S5_L002_R1_001.fastq.gz,
+SRR443368_T1,True,samples/SRR443368_pass_101_S5_L002_R1_001.fastq.gz,
+SRR443369_T1,True,samples/SRR443369_pass_101_S5_L002_R1_001.fastq.gz,
+SRR443370_T1,True,samples/SRR443370_pass_101_S5_L002_R1_001.fastq.gz,
