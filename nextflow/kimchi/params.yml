@@ -1,0 +1,14 @@
+project: 'naiss2023-22-601'
+input: 'samplesheet.csv'
+sequence_filter: '/proj/sllstore2017037/nobackup/emelie/SILVA_138.1_allrRNAref_NR99_tax.fasta'
+max_time: '7.day'
+orf_caller: 'prokka'
+assembler: 'megahit'
+#bbnorm: true
+skip_eukulele: false
+skip_eggnog: false
+eukulele_dbpath: './eukulele/' 
+eukulele_db: 'gtdb'
+eggnog_dbpath: './eggnog-mapper/'
+skip_kofamscan: true
+se_reads: true
