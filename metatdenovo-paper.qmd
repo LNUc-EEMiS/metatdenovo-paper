@@ -821,34 +821,34 @@ counts.eggnogs <- counts %>%
             sd = sd(tpm), 
             .groups = 'drop') %>%
   left_join( eggnogs, by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) ) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'A', 'RNA_process')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'B', 'Chromatin_Struc')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'C', 'Energy_prod')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'D', 'Cell_cycle')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'E', 'AA_metab')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'F', 'Nucl_metab')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'G', 'Carbohy_metab')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'H', 'Coenz_metab')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'I', 'Lipid_metab')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'J', 'Tranlsation')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'K', 'Transcription')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'L', 'Replication')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'M', 'Cell_wall')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'N', 'Cell_motility')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'O', 'Post-transl_mod')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'P', 'Inorg_ion_transp')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'Q', 'Sec_Structure')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'T', 'Signal_Transduc')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'U', 'Intracel_traf')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'Y', 'Nucl_structure')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'Z', 'Cytoskeleton')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'R', 'Gen_Func')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == 'S', 'Func_unknown')) %>%
-  mutate(COG_category = replace(COG_category, COG_category == '-', 'Func_unknown'))
+  mutate(cog_category = replace(cog_category, cog_category == 'A', 'RNA_process')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'B', 'Chromatin_Struc')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'C', 'Energy_prod')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'D', 'Cell_cycle')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'E', 'AA_metab')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'F', 'Nucl_metab')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'G', 'Carbohy_metab')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'H', 'Coenz_metab')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'I', 'Lipid_metab')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'J', 'Tranlsation')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'K', 'Transcription')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'L', 'Replication')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'M', 'Cell_wall')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'N', 'Cell_motility')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'O', 'Post-transl_mod')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'P', 'Inorg_ion_transp')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'Q', 'Sec_Structure')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'T', 'Signal_Transduc')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'U', 'Intracel_traf')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'Y', 'Nucl_structure')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'Z', 'Cytoskeleton')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'R', 'Gen_Func')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == 'S', 'Func_unknown')) %>%
+  mutate(cog_category = replace(cog_category, cog_category == '-', 'Func_unknown'))
 
 top13cog <- counts.eggnogs %>%
-  #filter( COG_category != '(S)Func_unknown') %>%
-  group_by(COG_category, sample) %>%
+  #filter( cog_category != '(S)Func_unknown') %>%
+  group_by(cog_category, sample) %>%
   summarise(tpm = sum(m_tpm),  .groups = 'drop_last') %>%
   summarise(mean_tpm = mean(tpm), .groups = 'drop') %>%
   slice_max(mean_tpm, n = 13) %>%
@@ -857,13 +857,13 @@ top13cog <- counts.eggnogs %>%
 # top 13 expressed COG category divided by samples
 p3 <- ( counts.eggnogs %>%
     as_tibble() %>%
-    inner_join(top13cog, by = 'COG_category') %>%
-    group_by(run, sample, COG_category) %>%
+    inner_join(top13cog, by = 'cog_category') %>%
+    group_by(run, sample, cog_category) %>%
     summarise(tpm = sum(m_tpm)/10^5, .groups = 'drop') %>%
-    mutate(COG_category = reorder(COG_category, -tpm)) %>%
+    mutate(cog_category = reorder(cog_category, -tpm)) %>%
     na.omit() %>%
     filter( run == 'megahit.prokka.without_bbnorm') %>%
-    ggplot(aes(x = COG_category, y = tpm)) +
+    ggplot(aes(x = cog_category, y = tpm)) +
     theme(
           legend.position = 'null') +
     scale_fill_manual(values = mst1.samples.color) +
@@ -890,40 +890,40 @@ p3 <- ( counts.eggnogs %>%
 # create the dataframe
 # rename those values in the column that are not correct
 counts.eggnogs.selectedgenes <- counts.eggnogs %>% 
-  mutate(Preferred_name = recode( Preferred_name, "pet.*"= "pet")) %>%
-  mutate(Preferred_name = if_else(grepl("DctM.*", PFAMs), "dctM", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*Bacteriorhodopsin*", Description), "prd", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("PFAM Sodium sulphate symporter", Description), "str", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*dicarboxylate transport system*", Description), "ttdt", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*nucleoside transporter*", Description), "nucT", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*pyrophosphate-specific outer membrane porin*", Description), "oprO", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*multidrug transport system*", Description), "mtsp", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*Zn-dependent protease with chaperone function*", Description), "pcf", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*PQQ-like domain*", Description), "mxaF", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*Low-potential electron donor to a number of redox enzymes*", Description), "fld", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*tail specific protease*", Description), "cpt", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*Belongs to the peptidase S41A family*", Description), "ctp", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*Peptidase, S41 family*", Description), "ctp", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*chemotaxis, protein*", Description), "ctp", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*rbc*", Preferred_name), "rbc", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*Molybdopterin oxidoreductase Fe4S4 domain*", Description), "mor", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*Flagellar regulatory protein FleQ*", Description), "fleq", Preferred_name)) %>%
-  mutate(Preferred_name = if_else(grepl("*Haemolysin-type calcium-binding repeat (2 copies)*", Description), "hcbr", Preferred_name)) %>%
+  mutate(preferred_name = recode( preferred_name, "pet.*"= "pet")) %>%
+  mutate(preferred_name = if_else(grepl("DctM.*", pfams), "dctM", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*Bacteriorhodopsin*", description), "prd", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("PFAM Sodium sulphate symporter", description), "str", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*dicarboxylate transport system*", description), "ttdt", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*nucleoside transporter*", description), "nucT", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*pyrophosphate-specific outer membrane porin*", description), "oprO", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*multidrug transport system*", description), "mtsp", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*Zn-dependent protease with chaperone function*", description), "pcf", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*PQQ-like domain*", description), "mxaF", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*Low-potential electron donor to a number of redox enzymes*", description), "fld", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*tail specific protease*", description), "cpt", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*Belongs to the peptidase S41A family*", description), "ctp", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*Peptidase, S41 family*", description), "ctp", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*chemotaxis, protein*", description), "ctp", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*rbc*", preferred_name), "rbc", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*Molybdopterin oxidoreductase Fe4S4 domain*", description), "mor", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*Flagellar regulatory protein FleQ*", description), "fleq", preferred_name)) %>%
+  mutate(preferred_name = if_else(grepl("*Haemolysin-type calcium-binding repeat (2 copies)*", description), "hcbr", preferred_name)) %>%
   as_tibble() %>%
-  group_by(sample, Preferred_name) %>%
+  group_by(sample, preferred_name) %>%
   summarise(tpm = sum(m_tpm), .groups = 'drop') %>%
   na.omit() %>%
   filter( sample %in% c("Lca", "Lcc")) %>%
-  filter( Preferred_name %in% c("atpC", "nqrB", "ccoN", "nqrE", "ccmC", "sdhD", "coxN", "mxaF", "pet", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr") )
+  filter( preferred_name %in% c("atpC", "nqrB", "ccoN", "nqrE", "ccmC", "sdhD", "coxN", "mxaF", "pet", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr") )
 
 # create the order for the x-axis as the same as in the original paper
-counts.eggnogs.selectedgenes$Preferred_name <- factor(counts.eggnogs.selectedgenes$Preferred_name, levels = c("nqrB", "atpC", "ccoN", "nqrE", "pet", "ccmC", "sdhD", "coxN", "mxaF", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr"))
+counts.eggnogs.selectedgenes$preferred_name <- factor(counts.eggnogs.selectedgenes$preferred_name, levels = c("nqrB", "atpC", "ccoN", "nqrE", "pet", "ccmC", "sdhD", "coxN", "mxaF", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr"))
 
 setcol <- c( "red", "dark green")
 # plot the result
 p5 <- counts.eggnogs.selectedgenes %>%
-  filter( Preferred_name != "str") %>%
-  ggplot(aes(x = Preferred_name, y = tpm, fill = sample )) +
+  filter( preferred_name != "str") %>%
+  ggplot(aes(x = preferred_name, y = tpm, fill = sample )) +
   geom_col(position = "dodge", color = "black") +
   scale_fill_manual(values = setcol) +
   scale_y_log10(limits = c(1, 1e6)) +
