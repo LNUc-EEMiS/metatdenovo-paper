@@ -1,4 +1,4 @@
-sessionname metatdenovo-ms
+sessionname metatdenovo-paper
 setenv ROOT $PWD
 # __INSERTPOINT__ This line allows a script to insert new configuration lines here.
 chdir $ROOT/nextflow/mst-1
