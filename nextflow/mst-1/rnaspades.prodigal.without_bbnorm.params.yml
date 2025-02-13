@@ -1,8 +1,5 @@
 input: 'samples.csv'
 outdir: 'rnaspades.prodigal.without_bbnorm'
-max_time: '7.day'
-max_cpus: 22
-max_memory: '126.GB'
 assembler: 'rnaspades'
 orf_caller: 'prodigal'
 bbnorm: false

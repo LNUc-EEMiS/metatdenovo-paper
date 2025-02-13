@@ -1,8 +1,5 @@
 input: 'samples.csv'
 outdir: 'rnaspades.prokka.without_bbnorm.minlen200'
-max_time: '7.day'
-max_cpus: 22
-max_memory: '126.GB'
 assembler: 'rnaspades'
 orf_caller: 'prokka'
 bbnorm: false
