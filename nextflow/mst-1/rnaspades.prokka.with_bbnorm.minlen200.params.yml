@@ -1,6 +1,6 @@
 input: 'samples.csv'
-outdir: 'rnaspades.prokka.with_bbnorm.minlen200'
-assembler: 'rnaspades'
+outdir: 'spades.prokka.with_bbnorm.minlen200'
+assembler: 'spades'
 orf_caller: 'prokka'
 bbnorm: true
 diamond_dbs: '../diamond_dbs.csv'

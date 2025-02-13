@@ -1,6 +1,6 @@
 input: 'samples.csv'
-outdir: 'rnaspades.prodigal.with_bbnorm'
-assembler: 'rnaspades'
+outdir: 'spades.prodigal.with_bbnorm'
+assembler: 'spades'
 orf_caller: 'prodigal'
 bbnorm: true
 diamond_dbs: '../diamond_dbs.csv'
