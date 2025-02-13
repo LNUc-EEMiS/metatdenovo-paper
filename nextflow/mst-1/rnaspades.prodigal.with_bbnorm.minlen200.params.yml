@@ -6,6 +6,7 @@ max_memory: '126.GB'
 assembler: 'rnaspades'
 orf_caller: 'prodigal'
 bbnorm: true
+diamond_dbs: '../diamond_dbs.csv'
 skip_eukulele: false
 eukulele_dbpath: './eukulele/' 
 eukulele_db: 'gtdb'
