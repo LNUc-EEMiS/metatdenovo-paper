@@ -1,42 +1,50 @@
 process	process_group	ncpus	ordernum
-BBMAP_ALIGN	quantification	6	060
-BBMAP_BBDUK	contaminant-removal	6	020
-BBMAP_BBNORM	read-depth norm.	6	030
-BBMAP_INDEX	quantification	1	060
-COLLECT_FEATURECOUNTS	quantification	12	060
+BBMAP_ALIGN	quantification	6	60
+BBMAP_BBDUK	contaminant-removal	6	20
+BBMAP_BBNORM	read-depth norm.	6	30
+BBMAP_INDEX	quantification	1	60
+CAT_FASTQ	other	1	100
+COLLECT_FEATURECOUNTS	quantification	12	60
 COLLECT_STATS	summary	2	110
 CUSTOM_DUMPSOFTWAREVERSIONS	other	1	100
-EGGNOG_MAPPER	eggnog annot.	6	080
-EGGNOG_SUM	eggnog annot.	2	080
-EUKULELE_SEARCH	taxon. annot.	12	070
-FAA_CAT	orf-calling	2	050
-FASTQC	qc	6	010
-FEATURECOUNTS_CDS	quantification	6	060
-FFN_CAT	orf-calling	2	050
-FORMAT_PRODIGAL_GFF	orf-calling	2	050
-FORMATSPADES	assembly	2	040
-FORMAT_TAX	summary	2	110
-GFF_CAT	orf-calling	2	050
+DIAMOND_TAXONOMY	taxon. annot.	12	70
+EGGNOG_MAPPER	eggnog annot.	6	80
+EGGNOG_SUM	eggnog annot.	2	80
+EUKULELE_SEARCH	taxon. annot.	12	70
+FAA_CAT	orf-calling	2	50
+FASTQC	qc	6	10
+FEATURECOUNTS_CDS	quantification	6	60
+FFN_CAT	orf-calling	2	50
+FORMAT_PRODIGAL_GFF	orf-calling	2	50
+FORMATSPADES	assembly	2	40
+FORMAT_DIAMOND_TAX_RANKLIST	summary	1	110
+FORMAT_DIAMOND_TAX_TAXDUMP	summary	6	110
+FORMAT_EUKULELE_TAX	summary	2	110
+GFF_CAT	orf-calling	2	50
 KOFAMSCAN_DOWNLOAD	other	1	100
-KOFAMSCAN_SCAN	kofam annot.	6	090
-MEGAHIT_INTERLEAVED	assembly	12	040
+KOFAMSCAN_SCAN	kofam annot.	6	90
+KOFAMSCAN_SUM	kofam annot.	2	90
+MEGAHIT_INTERLEAVED	assembly	12	40
 MERGE_TABLES	summary	2	110
 MULTIQC	summary	1	110
-PRODIGAL_MODULE	orf-calling	1	050
-PROKKAGFF2TSV	orf-calling	6	050
-PROKKA	orf-calling	2	050
+PIGZ_DIAMOND_LINEAGE	taxon. annot.	2	70
+PRODIGAL_MODULE	orf-calling	1	50
+PROKKAGFF2TSV	orf-calling	6	50
+PROKKA	orf-calling	2	50
 SAMPLESHEET_CHECK	other	1	100
-SAMTOOLS_FLAGSTAT	quantification	1	060
-SAMTOOLS_IDXSTATS	quantification	1	060
-SAMTOOLS_INDEX	quantification	2	060
-SAMTOOLS_SORT	quantification	6	060
-SAMTOOLS_STATS	quantification	1	060
-SEQTK_MERGEPE	assembly	1	040
-SPADES	assembly	12	040
-SUM_KOFAMSCAN	kofam annot.	2	090
-SUM_TAXONOMY	taxon. annot.	2	070
+SAMTOOLS_FLAGSTAT	quantification	1	60
+SAMTOOLS_IDXSTATS	quantification	1	60
+SAMTOOLS_INDEX	quantification	2	60
+SAMTOOLS_SORT	quantification	6	60
+SAMTOOLS_STATS	quantification	1	60
+SEQTK_MERGEPE	assembly	1	40
+SEQTK_SEQ_CONTIG_FILTER	orf-calling	1	50
+SPADES	assembly	12	40
+SUM_DIAMONDTAX	taxon. annot.	2	70
+SUM_EUKULELE_TAXONOMY	taxon. annot.	2	70
+TAXONKIT_LINEAGE	taxon. annot.	2	70
 TRANSRATE	summary	2	110
-TRIMGALORE	qc	12	010
+TRIMGALORE	qc	12	10
 UNPIGZ_CONTIGS	other	2	100
 UNPIGZ_GFF	other	2	100
-WRITESPADESYAML	assembly	1	040
+WRITESPADESYAML	assembly	1	40
