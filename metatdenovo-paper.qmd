@@ -74,7 +74,7 @@ samples <- tribble(
 #| cache-lazy: false
 
 extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
-  read_tsv(show_col_types = FALSE, id = 'fname') %>%
+  read_tsv(col_types = 'icicccTccccccc', id = 'fname') %>%
   mutate(
     project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
     run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*'),
@@ -220,7 +220,7 @@ counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
 #| label: read-eukulele
 #| cache-lazy: false
 
-eukulele <- Sys.glob('nextflow/*/*/summary_tables/*_taxonomy.tsv.gz') %>%
+eukulele <- Sys.glob('nextflow/*/*/summary_tables/*eukulele.taxonomy.tsv.gz') %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
     db      = str_replace(fname, 'nextflow\\/.*\\.(.*)_taxonomy.tsv.gz', '\\1'),
@@ -349,11 +349,7 @@ hellinger_pca <- function(ds) {
     vegan::rda()
 }
 pcas <- list()
-for ( r in c(
-  'megahit.prodigal.without_bbnorm', 'rnaspades.prodigal.without_bbnorm', 
-  'megahit.prokka.without_bbnorm',   'rnaspades.prokka.without_bbnorm'
-  ) 
-) {
+for ( r in counts %>% distinct(run) %>% filter(str_detect(run, 'without_bbnorm')) %>% pull(run) ) {
   pcas[[sprintf("%s-eggnogs", r)]] <- counts %>% 
     filter(run == r) %>%
     inner_join(
@@ -384,6 +380,7 @@ for ( r in c(
 #| label: tax-annots-og
 #| cache-lazy: false
 
+# DL: It would be better to have this and the next one in tables that we read in.
 original.tax <- tibble(
   sample = c(rep("Lca",7), rep("Lcc",7), rep("Hca",7), rep("Hcc",7)),
   family = c(rep(c("Other Flavobacteria", "Flavobacteriaceae", "Other Gammaproteobacteria", "Alteromonadaceae", "Other Alphaproteobacteria", "SAR11 clade", "Rhodobacteraceae"),4)),
@@ -453,7 +450,7 @@ and RNASpades
 #| fig-cap: '**CPU consumption, assembly memory usage and size.** A) Realtime cpu use per task type and pipeline execution, B) peak virtual memory usage and C) assembly size per assembly.'
 
 p0 <- extraces %>%
-  filter(project == 'mst-1', minlen == 0) %>%
+  filter(project == 'mst-1') %>% #, minlen == 0) %>%
   left_join(process_groups, by = join_by(process)) %>%
   arrange(assembly, bbnorm, orf_caller) %>%
   mutate(name = sprintf("%s: %s", assembly, orf_caller) %>% factor() %>% fct_inorder() %>% fct_rev()) %>%
@@ -467,7 +464,7 @@ p0 <- extraces %>%
   theme(axis.text.y = element_text(size=12))
 
 p1 <- extraces %>%
-  filter(project == 'mst-1', minlen == 0) %>%
+  filter(project == 'mst-1') %>% #, minlen == 0) %>%
   left_join(process_groups, by = join_by(process)) %>%
   filter(process_group == 'assembly') %>%
   mutate(assembler = factor(assembler) %>% fct_inorder() %>% fct_rev()) %>%
@@ -486,7 +483,7 @@ p1 <- extraces %>%
   theme(axis.text.y = element_text(size=12))
 
 p2 <- transrates %>%
-  filter(project == 'mst-1', minlen == 0) %>%
+  filter(project == 'mst-1') %>% #, minlen == 0) %>%
   mutate(mbp = n_bases/1000^2 %>% round()) %>%
   mutate(assembler = factor(assembler) %>% fct_inorder() %>% fct_rev()) %>%
   ggplot(aes(x = assembler, y = mbp, colour = bbnorm)) +
@@ -509,7 +506,7 @@ p0 / ( p1 + p2 ) +
 
 transrates %>%
   filter(project == 'mst-1') %>%
-  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
+  filter(! ( assembler == 'spades' & minlen == 0) ) %>%
   inner_join(
     overall_stats %>% 
       transmute(project, assembler, bbnorm, minlen, sample, prop_mapped = idxs_n_mapped/n_non_contaminated) %>%
@@ -541,7 +538,7 @@ See (@fig-orf-calling).
 
 ```{r fig-orf-calling}
 #| label: fig-orf-calling
-#| fig-height: 10
+#| fig-height: 8
 #| fig-cap: '**ORF calling statistics.** A) Rank-abundance curves per ORF with number of samples each ORF occurs in in colour. B) Counts per sample. C) Length distributions of ORFs for the four assemblies using Prodigal or Prokka. *) The assembly was made from read-depth-normalized data. †) Contigs shorter than 200 nucleotides were removed before ORF calling.'
 
 plot_rank_abundance <- function(ds) {
@@ -563,7 +560,7 @@ plot_rank_abundance <- function(ds) {
 
 p0 <- counts %>%
   filter(project == 'mst-1') %>%
-  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
+  filter(! ( assembler == 'spades' & minlen == 0) ) %>%
   group_by(run, assembly, assembler, orf_caller, bbnorm, orf) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop_last') %>%
   arrange(assembler, bbnorm) %>%
@@ -574,7 +571,7 @@ p0 <- counts %>%
 
 p1 <- counts %>%
   filter(project == 'mst-1') %>%
-  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
+  filter(! ( assembler == 'spades' & minlen == 0) ) %>%
   arrange(assembly, bbnorm, orf_caller) %>%
   mutate(assembly_orfc = sprintf("%s: %s", assembly, orf_caller) %>% factor() %>% fct_inorder()) %>%
   group_by(assembly_orfc, sample) %>%
@@ -592,19 +589,20 @@ p1 <- counts %>%
 
 p2 <- counts %>%
   filter(project == 'mst-1') %>% #, minlen == 0) %>%
-  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
+  filter(! ( assembler == 'spades' & minlen == 0) ) %>%
   select(project:minlen, orf, length) %>% 
   mutate(length = length * 3) %>%
   distinct() %>%
   arrange(assembler, bbnorm) %>%
   mutate(assembly = factor(assembly) %>% fct_inorder() %>% fct_rev()) %>%
   ggplot(aes(x = assembly, y = length, fill = orf_caller)) +
-  geom_violin() +
+  geom_violin(draw_quantiles = c(0.5)) +
   scale_y_log10() +
+  scale_fill_discrete('ORF caller') +
   coord_flip()
 
 ( p0 + p1 ) / p2 +
-  plot_layout(widths = c(3, 2), heights = c(7,3)) +
+  plot_layout(widths = c(3, 2), heights = c(7,4)) +
   plot_annotation(tag_levels = 'A')
 ```
 
@@ -619,7 +617,7 @@ p2 <- counts %>%
 
 p0 <- eukulele %>%
   filter(project == 'mst-1', db == 'gtdb') %>%
-  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
+  filter(! ( assembler == 'spades' & minlen == 0) ) %>%
   inner_join(
     counts %>%
       group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
@@ -645,7 +643,7 @@ p0 <- eukulele %>%
 
 p1 <- func_annots %>%
   filter(project == 'mst-1') %>%
-  filter(! ( assembler == 'rnaspades' & minlen == 0) ) %>%
+  filter(! ( assembler == 'spades' & minlen == 0) ) %>%
   inner_join(
     counts %>%
       group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
@@ -770,8 +768,8 @@ plot_pca <- function(pca, t) {
 
 p0 <- pcas[['megahit.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
 p1 <- pcas[['megahit.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
-p2 <- pcas[['rnaspades.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prokka')
-p3 <- pcas[['rnaspades.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prodigal')
+p2 <- pcas[['spades.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prokka')
+p3 <- pcas[['spades.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prodigal')
 
 ( p0 + p1 ) /
   ( p2 + p3 ) +
@@ -785,8 +783,8 @@ p3 <- pcas[['rnaspades.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca(
 
 p0 <- pcas[['megahit.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
 p1 <- pcas[['megahit.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
-p2 <- pcas[['rnaspades.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prokka')
-p3 <- pcas[['rnaspades.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prodigal')
+p2 <- pcas[['spades.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prokka')
+p3 <- pcas[['spades.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prodigal')
 
 ( p0 + p1 ) /
   ( p2 + p3 ) +
@@ -883,7 +881,7 @@ p3 <- ( counts.eggnogs %>%
       theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7)) )
 ```
 
-```{r mst rnaspades prodigal - functional annotation table - selected genes, echo = FALSE, warning = FALSE}
+```{r mst spades prodigal - functional annotation table - selected genes, echo = FALSE, warning = FALSE}
 # check the same genes that are DE in MST paper
 # nqrB atpC ccoN nqrE pet (there are severals type), ccmC, sdhd, coxN, mxaF, rhodopsin (change in prd), psaC, psbC, actP, secD, secE, multidrug transport system (change in mtsp), dicarboxylate transport system (change in ttdt), PFAM Sodium sulphate symporter (change in str), dctM (in pfam), nucleoside transporter (change in nucT), pyrophosphate-specific outer membrane porin (change in oprO)
 
