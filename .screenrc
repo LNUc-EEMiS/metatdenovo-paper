@@ -3,7 +3,7 @@ setenv ROOT $PWD
 # __INSERTPOINT__ This line allows a script to insert new configuration lines here.
 chdir $ROOT/nextflow/mst-1
 screen -t mst-1
-chdir scripts
+chdir $ROOT/scripts
 screen -t scripts
 chdir $ROOT
 screen -t rstudio
