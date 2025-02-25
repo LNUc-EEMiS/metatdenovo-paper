@@ -1,9 +1,0 @@
-sample,single_end,fastq_1,fastq_2
-KA1_T1,False,reads/ERR978610_1.fastq.gz,reads/ERR978610_2.fastq.gz
-KA2_T1,False,reads/ERR978611_1.fastq.gz,reads/ERR978611_2.fastq.gz
-KB1_T1,False,reads/ERR978612_1.fastq.gz,reads/ERR978612_2.fastq.gz
-KB2_T1,False,reads/ERR978613_1.fastq.gz,reads/ERR978613_2.fastq.gz
-NA1_T1,False,reads/ERR978614_1.fastq.gz,reads/ERR978614_2.fastq.gz
-NA2_T1,False,reads/ERR978615_1.fastq.gz,reads/ERR978615_2.fastq.gz
-NB1_T1,False,reads/ERR978616_1.fastq.gz,reads/ERR978616_2.fastq.gz
-NB2_T1,False,reads/ERR978617_1.fastq.gz,reads/ERR978617_2.fastq.gz

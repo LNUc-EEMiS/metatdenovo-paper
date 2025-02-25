@@ -1,2 +1,2 @@
 assembly,n_seqs,smallest,largest,n_bases,mean_len,n_under_200,n_over_1k,n_over_10k,n_with_orf,mean_orf_percent,n90,n70,n50,n30,n10,gc,bases_n,proportion_n,score,optimal_score,cutoff,weighted
-/data/dl/metatdenovo/metatdenovo-paper/nextflow/mst-1/work/7a/209e174dae13c6f09c77c85c2b85d6/megahit_assembly.contigs.fa,97521,200,103679,68735156,704.82415,0,12672,196,36287,69.84091,347,492,776,1495,5236,0.43373,0,0.0,NA,NA,NA,NA
+/data/dl/metatdenovo/metatdenovo-paper/nextflow/mst-1/work/21/fbb84b337183a4f956684505c38550/megahit_assembly.contigs.fa,97503,200,103660,68728971,704.89083,0,12662,195,36291,69.8428,347,492,777,1495,5236,0.43373,0,0.0,NA,NA,NA,NA
