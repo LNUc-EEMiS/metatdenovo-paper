@@ -1,50 +1,50 @@
-process	process_group	ncpus	ordernum
-BBMAP_ALIGN	quantification	6	60
-BBMAP_BBDUK	contaminant-removal	6	20
-BBMAP_BBNORM	read-depth norm.	6	30
-BBMAP_INDEX	quantification	1	60
-CAT_FASTQ	other	1	100
-COLLECT_FEATURECOUNTS	quantification	12	60
-COLLECT_STATS	summary	2	110
-CUSTOM_DUMPSOFTWAREVERSIONS	other	1	100
-DIAMOND_TAXONOMY	taxon. annot.	12	70
-EGGNOG_MAPPER	eggnog annot.	6	80
-EGGNOG_SUM	eggnog annot.	2	80
-EUKULELE_SEARCH	taxon. annot.	12	70
-FAA_CAT	orf-calling	2	50
-FASTQC	qc	6	10
-FEATURECOUNTS_CDS	quantification	6	60
-FFN_CAT	orf-calling	2	50
-FORMAT_PRODIGAL_GFF	orf-calling	2	50
-FORMATSPADES	assembly	2	40
-FORMAT_DIAMOND_TAX_RANKLIST	summary	1	110
-FORMAT_DIAMOND_TAX_TAXDUMP	summary	6	110
-FORMAT_EUKULELE_TAX	summary	2	110
-GFF_CAT	orf-calling	2	50
-KOFAMSCAN_DOWNLOAD	other	1	100
-KOFAMSCAN_SCAN	kofam annot.	6	90
-KOFAMSCAN_SUM	kofam annot.	2	90
-MEGAHIT_INTERLEAVED	assembly	12	40
-MERGE_TABLES	summary	2	110
-MULTIQC	summary	1	110
-PIGZ_DIAMOND_LINEAGE	taxon. annot.	2	70
-PRODIGAL_MODULE	orf-calling	1	50
-PROKKAGFF2TSV	orf-calling	6	50
-PROKKA	orf-calling	2	50
-SAMPLESHEET_CHECK	other	1	100
-SAMTOOLS_FLAGSTAT	quantification	1	60
-SAMTOOLS_IDXSTATS	quantification	1	60
-SAMTOOLS_INDEX	quantification	2	60
-SAMTOOLS_SORT	quantification	6	60
-SAMTOOLS_STATS	quantification	1	60
-SEQTK_MERGEPE	assembly	1	40
-SEQTK_SEQ_CONTIG_FILTER	orf-calling	1	50
-SPADES	assembly	12	40
-SUM_DIAMONDTAX	taxon. annot.	2	70
-SUM_EUKULELE_TAXONOMY	taxon. annot.	2	70
-TAXONKIT_LINEAGE	taxon. annot.	2	70
-TRANSRATE	summary	2	110
-TRIMGALORE	qc	12	10
-UNPIGZ_CONTIGS	other	2	100
-UNPIGZ_GFF	other	2	100
-WRITESPADESYAML	assembly	1	40
+process	process_group	ncpus	ordernum	manuscript_group
+BBMAP_ALIGN	quantification	6	60	quantification
+BBMAP_BBDUK	contaminant-removal	6	20	preprocessing
+BBMAP_BBNORM	read-depth norm.	6	30	preprocessing
+BBMAP_INDEX	quantification	1	60	quantification
+CAT_FASTQ	other	1	100	other
+COLLECT_FEATURECOUNTS	quantification	12	60	quantification
+COLLECT_STATS	summary	2	110	summary
+CUSTOM_DUMPSOFTWAREVERSIONS	other	1	100	other
+DIAMOND_TAXONOMY	taxon. annot.	12	70	taxon-annot
+EGGNOG_MAPPER	eggnog annot.	6	80	func-annot
+EGGNOG_SUM	eggnog annot.	2	80	func-annot
+EUKULELE_SEARCH	taxon. annot.	12	70	taxon-annot
+FAA_CAT	orf-calling	2	50	orf-calling
+FASTQC	qc	6	10	preprocessing
+FEATURECOUNTS_CDS	quantification	6	60	quantification
+FFN_CAT	orf-calling	2	50	orf-calling
+FORMAT_PRODIGAL_GFF	orf-calling	2	50	orf-calling
+FORMATSPADES	assembly	2	40	assembly
+FORMAT_DIAMOND_TAX_RANKLIST	summary	1	110	summary
+FORMAT_DIAMOND_TAX_TAXDUMP	summary	6	110	summary
+FORMAT_EUKULELE_TAX	summary	2	110	summary
+GFF_CAT	orf-calling	2	50	orf-calling
+KOFAMSCAN_DOWNLOAD	other	1	100	other
+KOFAMSCAN_SCAN	kofam annot.	6	90	func-annot
+KOFAMSCAN_SUM	kofam annot.	2	90	func-annot
+MEGAHIT_INTERLEAVED	assembly	12	40	assembly
+MERGE_TABLES	summary	2	110	summary
+MULTIQC	summary	1	110	summary
+PIGZ_DIAMOND_LINEAGE	taxon. annot.	2	70	taxon-annot
+PRODIGAL_MODULE	orf-calling	1	50	orf-calling
+PROKKAGFF2TSV	orf-calling	6	50	orf-calling
+PROKKA	orf-calling	2	50	orf-calling
+SAMPLESHEET_CHECK	other	1	100	other
+SAMTOOLS_FLAGSTAT	quantification	1	60	quantification
+SAMTOOLS_IDXSTATS	quantification	1	60	quantification
+SAMTOOLS_INDEX	quantification	2	60	quantification
+SAMTOOLS_SORT	quantification	6	60	quantification
+SAMTOOLS_STATS	quantification	1	60	quantification
+SEQTK_MERGEPE	assembly	1	40	assembly
+SEQTK_SEQ_CONTIG_FILTER	orf-calling	1	50	orf-calling
+SPADES	assembly	12	40	assembly
+SUM_DIAMONDTAX	taxon. annot.	2	70	taxon-annot
+SUM_EUKULELE_TAXONOMY	taxon. annot.	2	70	taxon-annot
+TAXONKIT_LINEAGE	taxon. annot.	2	70	taxon-annot
+TRANSRATE	summary	2	110	summary
+TRIMGALORE	qc	12	10	preprocessing
+UNPIGZ_CONTIGS	other	2	100	other
+UNPIGZ_GFF	other	2	100	other
+WRITESPADESYAML	assembly	1	40	assembly

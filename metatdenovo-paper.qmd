@@ -53,6 +53,37 @@ TAXON_RANKS_SORTED = c('root', 'domain', 'phylum', 'class', 'order', 'family', '
 mst1.samples.color <- c("#ea3a25", "#f09536", "#1a43f5", "#74fafd")
 ```
 
+```{r func-post-process-table}
+#| label: func-post-process-table
+post_process_table <- function(paths) {
+  #t <- Sys.glob('nextflow/*/*/summary_tables/*.gtdb-r220.diamond.taxonomy.tsv.gz') %>%
+  #t <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
+  paths %>%
+    read_tsv(id = 'fname', show_col_types = FALSE) %>%
+    mutate(
+      project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+      run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+    ) %>%
+    separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+    mutate(
+      minlen = case_when(
+        is.na(minlen)                 ~ 0,
+        str_detect(minlen, 'diamond') ~ 0, 
+        str_detect(minlen, 'minlen')  ~ str_remove(minlen, 'minlen') %>% as.integer()
+      )
+    ) %>%
+    mutate(
+      assembly = sprintf("%s%s%s%s", 
+        assembler, 
+        ifelse(!is.na(bbnorm) & bbnorm == 'with_bbnorm', '*', ''), 
+        ifelse(!is.na(minlen) & minlen > 0, '†', ''), 
+        ifelse(str_detect(fname, 'top3'), '3', '')
+      )
+    ) %>%
+    relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
+}
+```
+
 ```{r create-samples}
 #| label: create-samples
 
@@ -74,6 +105,7 @@ samples <- tribble(
 #| cache-lazy: false
 
 extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
+  str_subset('top3', negate = TRUE) %>%
   read_tsv(col_types = 'icicccTccccccc', id = 'fname') %>%
   mutate(
     project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
@@ -143,6 +175,7 @@ process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE) %>
 #| cache-lazy: false
 
 overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %>%
+  str_subset('top3', negate = TRUE) %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
     project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
@@ -155,12 +188,14 @@ overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
 ```
 
-```{r read-transrate}
-#| label: read-transrate
+```{r read-transrates}
+#| label: read-transrates
 #| warning: false
 #| cache-lazy: false
 
 transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
+  str_subset('top3', negate = TRUE) %>%
+  str_subset('prodigal') %>%
   read_csv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
     project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
@@ -179,6 +214,8 @@ transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
 #| cache-lazy: false
 
 idxstats <- Sys.glob('nextflow/*/*/samtools/*.idxstats') %>%
+  str_subset('top3', negate = TRUE) %>%
+  #post_process_table()
   read_tsv(id = 'fname', show_col_types = FALSE, col_names = c('contig', 'length', 'n_mapped', 'n_unmapped')) %>%
   filter(contig != '*', n_mapped > 0) %>%
   mutate(
@@ -204,16 +241,8 @@ idxstats <- Sys.glob('nextflow/*/*/samtools/*.idxstats') %>%
 #| cache-lazy: false
 
 counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
-  read_tsv(id = 'fname', show_col_types = FALSE) %>%
-  mutate(
-    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
-    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
-  ) %>%
-  select(-fname) %>%
-  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
-  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
-  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, sample)
+  #str_subset('top3', negate = TRUE) %>%
+  post_process_table()
 ```
 
 ```{r read-eukulele}
@@ -221,17 +250,12 @@ counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
 #| cache-lazy: false
 
 eukulele <- Sys.glob('nextflow/*/*/summary_tables/*eukulele.taxonomy.tsv.gz') %>%
-  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  str_subset('top3', negate = TRUE) %>%
+  post_process_table() %>%
   mutate(
-    db      = str_replace(fname, 'nextflow\\/.*\\.(.*)_taxonomy.tsv.gz', '\\1'),
-    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
-    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+    db      = str_replace(fname, 'nextflow\\/.*\\.(.*).eukulele.taxonomy.tsv.gz', '\\1'),
   ) %>%
   select(-fname) %>%
-  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
-  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
-  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, db) %>%
   mutate(
     taxon_rank = case_when(
       str_detect(domain,  'uncl\\.')  ~ 'root',
@@ -246,11 +270,36 @@ eukulele <- Sys.glob('nextflow/*/*/summary_tables/*eukulele.taxonomy.tsv.gz') %>
   )
 ```
 
+```{r read-diamondtax}
+#| label: read-diamondtax
+diamondtax.gtdb <- Sys.glob('nextflow/*/*/summary_tables/*.gtdb-r220.diamond.taxonomy.tsv.gz') %>%
+  #str_subset('top3', negate = TRUE) %>%
+  post_process_table() %>%
+  mutate(
+    taxon_rank = case_when(
+      is.na(domain)  ~ 'root',
+      is.na(phylum)  ~ 'domain',
+      is.na(class)   ~ 'phylum',
+      is.na(order)   ~ 'class',
+      is.na(family)  ~ 'order',
+      is.na(genus)   ~ 'family',
+      is.na(species) ~ 'genus',
+      TRUE           ~ 'species'
+    ) %>% factor(levels = TAXON_RANKS_SORTED, ordered = TRUE)
+  ) %>%
+  select(-fname)
+diamondtax.refseq <- Sys.glob('nextflow/*/*/summary_tables/*.ncbi-refseq-*.diamond.taxonomy.tsv.gz') %>%
+  #str_subset('top3', negate = TRUE) %>%
+  post_process_table() %>%
+  select(-fname)
+```
+
 ```{r read-eggnogs}
 #| label: read-eggnogs
 #| cache-lazy: false
 
 eggnogs <- Sys.glob('nextflow/*/*/summary_tables/*.emapper.tsv.gz') %>%
+  str_subset('top3', negate = TRUE) %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
     project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
@@ -283,6 +332,7 @@ eggnogs.edger <- read_tsv(
 #| cache-lazy: false
 
 kofams <- Sys.glob('nextflow/*/*/summary_tables/*.kofamscan.tsv.gz') %>%
+  str_subset('top3', negate = TRUE) %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
     project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
@@ -300,6 +350,7 @@ kofams <- Sys.glob('nextflow/*/*/summary_tables/*.kofamscan.tsv.gz') %>%
 #| cache-lazy: false
 
 prokkas <- Sys.glob('nextflow/*/*/summary_tables/*.prokka-annotations.tsv.gz') %>%
+  str_subset('top3', negate = TRUE) %>%
   read_tsv(id = 'fname', show_col_types = FALSE, guess_max = 1e6) %>%
   mutate(
     project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
@@ -338,42 +389,43 @@ func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = '
 
 ```{r hellinger-pcas}
 #| label: hellinger-pcas
-hellinger_pca <- function(ds) {
-  ds %>%
-    group_by(sample, variable) %>%
-    summarise(count = sum(count), .groups = 'drop') %>%
-    pivot_wider(names_from = variable, values_from = count, values_fill = 0) %>%
-    as.data.frame() %>%
-    column_to_rownames('sample') %>%
-    vegan::decostand(method = 'hellinger') %>%
-    vegan::rda()
-}
-pcas <- list()
-for ( r in counts %>% distinct(run) %>% filter(str_detect(run, 'without_bbnorm')) %>% pull(run) ) {
-  pcas[[sprintf("%s-eggnogs", r)]] <- counts %>% 
-    filter(run == r) %>%
-    inner_join(
-      eggnogs %>%
-        select(project, run, eggnog_ogs, orf) %>%
-        separate_rows(eggnog_ogs, sep = ',') %>%
-        separate(eggnog_ogs, c('eggnog', 'taxon'), sep = '@') %>%
-        filter(taxon == '1|root') %>%
-        select(-taxon) %>%
-        distinct(run, orf, .keep_all = TRUE),
-      by = join_by(project, run, orf)
-    ) %>%
-    rename(variable = eggnog) %>%
-    hellinger_pca()
-  pcas[[sprintf("%s-families", r)]] <- counts %>% 
-    filter(run == r) %>% 
-    inner_join(
-      eukulele %>%
-        select(project, run, orf, domain:species),
-      by = join_by(project, run, orf)
-    ) %>%
-    rename(variable = family) %>%
-    hellinger_pca()
-}
+#| eval: false
+# hellinger_pca <- function(ds) {
+#   ds %>%
+#     group_by(sample, variable) %>%
+#     summarise(count = sum(count), .groups = 'drop') %>%
+#     pivot_wider(names_from = variable, values_from = count, values_fill = 0) %>%
+#     as.data.frame() %>%
+#     column_to_rownames('sample') %>%
+#     vegan::decostand(method = 'hellinger') %>%
+#     vegan::rda()
+# }
+# pcas <- list()
+# for ( r in counts %>% distinct(run) %>% filter(str_detect(run, 'without_bbnorm')) %>% pull(run) ) {
+#   pcas[[sprintf("%s-eggnogs", r)]] <- counts %>% 
+#     filter(run == r) %>%
+#     inner_join(
+#       eggnogs %>%
+#         select(project, run, eggnog_ogs, orf) %>%
+#         separate_rows(eggnog_ogs, sep = ',') %>%
+#         separate(eggnog_ogs, c('eggnog', 'taxon'), sep = '@') %>%
+#         filter(taxon == '1|root') %>%
+#         select(-taxon) %>%
+#         distinct(run, orf, .keep_all = TRUE),
+#       by = join_by(project, run, orf)
+#     ) %>%
+#     rename(variable = eggnog) %>%
+#     hellinger_pca()
+#   pcas[[sprintf("%s-families", r)]] <- counts %>% 
+#     filter(run == r) %>% 
+#     inner_join(
+#       eukulele %>%
+#         select(project, run, orf, domain:species),
+#       by = join_by(project, run, orf)
+#     ) %>%
+#     rename(variable = family) %>%
+#     hellinger_pca()
+# }
 ```
 
 ```{r tax-annots-og}
@@ -414,6 +466,10 @@ Cite nf-core [@nf-core].
 
 # Materials and Methods
 
+Compute resources were taken from Nextflow's `execution_trace*` files after making sure that the pipeline finished in a single run.
+To calculate the cpu time, the `realtimec` column was multiplied with the number of cpus.
+The latter was calculated by rounding the `%cpu` up to the nearest hundred and dividing by a hundred.
+
 ## R and packages
 
 This analysis was run with `r R.version$version.string`. Versions of packages used can be found in Table @tbl-cite-packages.
@@ -447,7 +503,7 @@ and RNASpades
 ```{r fig-extraces}
 #| label: fig-extraces
 #| fig-height: 5
-#| fig-cap: '**CPU consumption, assembly memory usage and size.** A) Realtime cpu use per task type and pipeline execution, B) peak virtual memory usage and C) assembly size per assembly.'
+#| fig-cap: '**CPU consumption, assembly memory usage and size.** A) Realtime cpu use per task type and pipeline execution, B) peak virtual memory usage and C) assembly size per assembly. Cpu use was calculated by the product of wall time and number of cpus used.'
 
 p0 <- extraces %>%
   filter(project == 'mst-1') %>% #, minlen == 0) %>%
@@ -500,9 +556,23 @@ p0 / ( p1 + p2 ) +
   plot_annotation(tag_levels = 'A')
 ```
 
+```{r tbl-extraces}
+#| label: tbl-extraces
+#| tbl-cap: '**Resource usage per manuscript category.**'
+process_groups %>% 
+  inner_join(extraces, by = join_by(process)) %>%
+  group_by(assembly, orf_caller, manuscript_group) %>% 
+  summarise(realtimec = sum(realtimec * num_cpus), max_memory_gb = round(max(peak_vmemc)/1024^3), .groups = 'drop') %>% 
+  group_by(assembly, orf_caller) %>% 
+  mutate(realtimeprop = round(realtimec/sum(realtimec), 2)) %>% 
+  ungroup() %>%
+  filter(manuscript_group == 'taxon-annot') %>%
+  kable()
+```
+
 ```{r tbl-assembly-stats}
 #| label: tbl-assembly-stats
-#| tbl-cap: '**Overall statistics for MST-1 assemblies.** *) The assembly was made from read-normalized data. †) Contigs shorter than 200 nucleotides were removed using the --min_contig_length parameter.'
+#| tbl-cap: '**Overall statistics for MST-1 assemblies.** The runs using the Prodigal ORF caller was used for this table. *) The assembly was made from read-normalized data. †) Contigs shorter than 200 nucleotides were removed using the --min_contig_length parameter.'
 
 transrates %>%
   filter(project == 'mst-1') %>%
@@ -561,6 +631,7 @@ plot_rank_abundance <- function(ds) {
 p0 <- counts %>%
   filter(project == 'mst-1') %>%
   filter(! ( assembler == 'spades' & minlen == 0) ) %>%
+  filter(assembly != 'megahit3') %>%
   group_by(run, assembly, assembler, orf_caller, bbnorm, orf) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop_last') %>%
   arrange(assembler, bbnorm) %>%
@@ -572,6 +643,7 @@ p0 <- counts %>%
 p1 <- counts %>%
   filter(project == 'mst-1') %>%
   filter(! ( assembler == 'spades' & minlen == 0) ) %>%
+  filter(assembly != 'megahit3') %>%
   arrange(assembly, bbnorm, orf_caller) %>%
   mutate(assembly_orfc = sprintf("%s: %s", assembly, orf_caller) %>% factor() %>% fct_inorder()) %>%
   group_by(assembly_orfc, sample) %>%
@@ -590,6 +662,7 @@ p1 <- counts %>%
 p2 <- counts %>%
   filter(project == 'mst-1') %>% #, minlen == 0) %>%
   filter(! ( assembler == 'spades' & minlen == 0) ) %>%
+  filter(assembly != 'megahit3') %>%
   select(project:minlen, orf, length) %>% 
   mutate(length = length * 3) %>%
   distinct() %>%
@@ -612,19 +685,31 @@ p2 <- counts %>%
 
 ```{r fig-mst-1-annot-success}
 #| label: fig-mst-1-annot-success
-#| fig.height: 7
+#| fig.height: 10
 #| fig-cap: '**Annotation success.** A) GTDB taxonomy and B) combinations of functional annotation. Unweighted, weighted by count and tpm respectively.'
 
 p0 <- eukulele %>%
   filter(project == 'mst-1', db == 'gtdb') %>%
-  filter(! ( assembler == 'spades' & minlen == 0) ) %>%
+  select(project, run, assembler, orf_caller, bbnorm, minlen, orf, assembly, taxon_rank) %>%
+  mutate(tool = 'EUKulele') %>%
+  union(
+    diamondtax.gtdb %>%
+      filter(taxon_rank != 'root') %>%
+      select(project, run, assembler, orf_caller, bbnorm, minlen, orf, assembly, taxon_rank) %>%
+      mutate(tool = 'Diamond-tax')
+  ) %>%
+  anti_join(
+    diamondtax.refseq %>% filter(str_detect(taxonomy, 'Eukaryota') | str_detect(taxonomy, 'Viruses')),
+    by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf, assembly)
+  ) %>%
+  #filter(! ( assembler == 'spades' & minlen == 0) ) %>%
   inner_join(
     counts %>%
       group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
       summarise(count = sum(count), tpm = sum(tpm), .groups = 'drop'),
     by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf)
   ) %>%
-  group_by(run, assembly, assembler, orf_caller, bbnorm, minlen, taxon_rank) %>%
+  group_by(run, assembly, assembler, orf_caller, bbnorm, minlen, taxon_rank, tool) %>%
   summarise(`N. ORFs` = n(), count = sum(count), tpm = sum(tpm), .groups = 'drop') %>%
   pivot_longer(`N. ORFs`:tpm, names_to = 'var', values_to = 'value') %>%
   mutate(var = factor(var, levels = c('N. ORFs', 'count', 'tpm'), ordered = TRUE)) %>%
@@ -634,7 +719,7 @@ p0 <- eukulele %>%
   ggplot(aes(name, value, fill = taxon_rank)) +
   geom_col() +
   scale_fill_brewer('Rank', palette = 'Set1') +
-  facet_wrap(~var, scales = 'free_x') +
+  facet_wrap(tool~var, scales = 'free') +
   xlab('') + ylab('') +
   coord_flip() +
   theme(
@@ -643,7 +728,7 @@ p0 <- eukulele %>%
 
 p1 <- func_annots %>%
   filter(project == 'mst-1') %>%
-  filter(! ( assembler == 'spades' & minlen == 0) ) %>%
+  #filter(! ( assembler == 'spades' & minlen == 0) ) %>%
   inner_join(
     counts %>%
       group_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) %>%
@@ -660,15 +745,17 @@ p1 <- func_annots %>%
   ggplot(aes(name, value, fill = combination)) +
   geom_col() +
   scale_fill_brewer('Annotation tools', palette = 'Set2') +
-  facet_wrap(~ var, scales = 'free_x') +
+  facet_wrap(~ var, scales = 'free') +
   xlab('') + ylab('') +
   coord_flip() +
   theme(
     axis.text.x = element_text(angle = 65, hjust = 1)
   )
 
+
 p0 / p1 +
-  plot_annotation(tag_levels = 'A')
+  plot_annotation(tag_levels = 'A') +
+  plot_layout(heights = c(2,1))
 ```
 
 ### What's the matter with NA2?
@@ -744,36 +831,36 @@ p0 / p1 +
   plot_annotation(tag_levels = 'A')
 ```
 
-### Functional and Taxonomical annotation - comparison with original data
+### Functional and taxonomic annotation - comparison with original data
 
 ```{r fig-mst-1-family-pcas}
 #| label: fig-mst-1-family-pcas
 #| fig-cap: '**MST-1 PCAs based on data summed at family.**'
 #| include: false
 
-plot_pca <- function(pca, t) {
-  e <- pca$eig
-  
-  pca$u %>%
-    as.data.frame() %>%
-    rownames_to_column('sample') %>%
-    inner_join(samples, by = join_by(sample)) %>%
-    ggplot(aes(x = PC1, y = PC2, colour = treatment, shape = replicate)) +
-    geom_point() +
-    #scale_colour_brewer('Sample', palette = 'Paired') +
-    xlab(sprintf("PC1 (%2.1f%%)", pca$eig[['PC1']]/sum(pca$eig) * 100)) +
-    ylab(sprintf("PC2 (%2.1f%%)", pca$eig[['PC2']]/sum(pca$eig) * 100)) +
-    ggtitle(t)
-}
-
-p0 <- pcas[['megahit.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
-p1 <- pcas[['megahit.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
-p2 <- pcas[['spades.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prokka')
-p3 <- pcas[['spades.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prodigal')
-
-( p0 + p1 ) /
-  ( p2 + p3 ) +
-  plot_layout(guides = 'collect')
+# plot_pca <- function(pca, t) {
+#   e <- pca$eig
+#   
+#   pca$u %>%
+#     as.data.frame() %>%
+#     rownames_to_column('sample') %>%
+#     inner_join(samples, by = join_by(sample)) %>%
+#     ggplot(aes(x = PC1, y = PC2, colour = treatment, shape = replicate)) +
+#     geom_point() +
+#     #scale_colour_brewer('Sample', palette = 'Paired') +
+#     xlab(sprintf("PC1 (%2.1f%%)", pca$eig[['PC1']]/sum(pca$eig) * 100)) +
+#     ylab(sprintf("PC2 (%2.1f%%)", pca$eig[['PC2']]/sum(pca$eig) * 100)) +
+#     ggtitle(t)
+# }
+# 
+# p0 <- pcas[['megahit.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
+# p1 <- pcas[['megahit.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
+# p2 <- pcas[['spades.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prokka')
+# p3 <- pcas[['spades.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prodigal')
+# 
+# ( p0 + p1 ) /
+#   ( p2 + p3 ) +
+#   plot_layout(guides = 'collect')
 ```
 
 ```{r mst-1-eggnog-pcas}
@@ -781,16 +868,15 @@ p3 <- pcas[['spades.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('RN
 #| fig-cap: '**MST-1 PCAs based on data summed at the root EGGNOG.**'
 #| include: false
 
-p0 <- pcas[['megahit.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
-p1 <- pcas[['megahit.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
-p2 <- pcas[['spades.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prokka')
-p3 <- pcas[['spades.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prodigal')
-
-( p0 + p1 ) /
-  ( p2 + p3 ) +
-  plot_layout(guides = 'collect')
+# p0 <- pcas[['megahit.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
+# p1 <- pcas[['megahit.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
+# p2 <- pcas[['spades.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prokka')
+# p3 <- pcas[['spades.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prodigal')
+# 
+# ( p0 + p1 ) /
+#   ( p2 + p3 ) +
+#   plot_layout(guides = 'collect')
 ```
-
 
 ### Functional annotation - comparison with original data
 
