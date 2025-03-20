@@ -1,0 +1,92 @@
+BBMAP_ALIGN:
+  bbmap: 39.01
+  samtools: 1.16.1
+  pigz: 2.6
+BBMAP_BBDUK:
+  bbmap: 39.1
+BBMAP_INDEX:
+  bbmap: 39.1
+CAT_FASTQ:
+  cat: 9.5
+COLLECT_FEATURECOUNTS:
+  R: 4.2.3
+  dplyr: 1.1.2
+  dtplyr: 1.3.1
+  data.table: 1.14.8
+COLLECT_STATS:
+  R: 4.2.3
+  dplyr: 1.1.2
+  readr: 2.1.4
+  purrr: 1.0.1
+  tidyr: 1.3.0
+  stringr: 1.5.0
+DIAMOND_TAXONOMY:
+  diamond: 2.1.10
+FAA_CAT:
+  pigz: 2.3.4
+FASTQC:
+  fastqc: 0.12.1
+FEATURECOUNTS_CDS:
+  subread: 2.0.6
+FFN_CAT:
+  pigz: 2.3.4
+FORMAT_DIAMOND_TAX_RANKLIST:
+  R: 4.2.3
+  tidyverse: 2.0.0
+FORMAT_DIAMOND_TAX_TAXDUMP:
+  R: 4.2.3
+  tidyverse: 2.0.0
+GFF_CAT:
+  pigz: 2.3.4
+MEGAHIT_INTERLEAVED:
+  megahit_interleaved: 1.2.9
+MERGE_TABLES:
+  R: 4.2.3
+  dplyr: 1.1.2
+  dtplyr: 1.3.1
+  data.table: 1.14.8
+  readr: 2.1.4
+  purrr: 1.0.1
+  tidyr: 1.3.0
+  stringr: 1.5.0
+PIGZ_DIAMOND_LINEAGE:
+  pigz: 2.8
+PROKKA:
+  prokka: 1.14.6
+PROKKAGFF2TSV:
+  R: 4.2.3
+  data.table: 1.14.8
+  dtplyr: 1.3.1
+  dplyr: 1.1.2
+  tidyr: 1.3.0
+  readr: 2.1.4
+SAMTOOLS_FLAGSTAT:
+  samtools: 1.21
+SAMTOOLS_IDXSTATS:
+  samtools: 1.21
+SAMTOOLS_INDEX:
+  samtools: 1.21
+SAMTOOLS_SORT:
+  samtools: 1.21
+SAMTOOLS_STATS:
+  samtools: 1.21
+SEQTK_MERGEPE:
+  seqtk: 1.4-r122
+SUM_DIAMONDTAX:
+  R: 4.2.3
+  tidyverse: 2.0.0
+TAXONKIT_LINEAGE:
+  taxonkit: 0.18.0
+TRANSRATE:
+  transrate: 1.0.3
+TRIMGALORE:
+  trimgalore: 0.6.10
+  cutadapt: 4.9
+  pigz: 2.8
+UNPIGZ_CONTIGS:
+  pigz: 2.3.4
+UNPIGZ_GFF:
+  pigz: 2.3.4
+Workflow:
+    nf-core/metatdenovo: v1.1.0-gd178881
+    Nextflow: 24.10.4

@@ -77,3 +77,6 @@ seqtk
 *.tex
 .~*
 grateful-refs.bib
+*taxonomy-taxdump.tsv.gz
+versions.yml
+params*.json
