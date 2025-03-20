@@ -566,7 +566,6 @@ process_groups %>%
   group_by(assembly, orf_caller) %>% 
   mutate(realtimeprop = round(realtimec/sum(realtimec), 2)) %>% 
   ungroup() %>%
-  filter(manuscript_group == 'taxon-annot') %>%
   kable()
 ```
 
@@ -646,12 +645,15 @@ p1 <- counts %>%
   filter(assembly != 'megahit3') %>%
   arrange(assembly, bbnorm, orf_caller) %>%
   mutate(assembly_orfc = sprintf("%s: %s", assembly, orf_caller) %>% factor() %>% fct_inorder()) %>%
-  group_by(assembly_orfc, sample) %>%
+  group_by(assembly_orfc, assembler, orf_caller, bbnorm, assembly, sample) %>%
   summarise(count = sum(count), tpm = sum(tpm), n_samples = n(), .groups = 'drop') %>%
-  ggplot(aes(x = sample, y = count, fill = sample)) +
+  inner_join(overall_stats, by = join_by(assembler, orf_caller, bbnorm, assembly, sample)) %>%
+  mutate(prop_mapped_to_orfs = count/n_non_contaminated) %>%
+  ggplot(aes(x = sample, y = prop_mapped_to_orfs * 100, fill = sample)) +
   geom_col() +
   scale_colour_brewer('Sample', palette = 'Paired') +
   xlab('') +
+  ylab('% read pairs mapped to ORFs') +
   facet_wrap(~assembly_orfc, ncol = 2) +
   theme(
     legend.position = 'bottom',
@@ -660,7 +662,7 @@ p1 <- counts %>%
   )
 
 p2 <- counts %>%
-  filter(project == 'mst-1') %>% #, minlen == 0) %>%
+  filter(project == 'mst-1') %>%
   filter(! ( assembler == 'spades' & minlen == 0) ) %>%
   filter(assembly != 'megahit3') %>%
   select(project:minlen, orf, length) %>% 
@@ -672,6 +674,7 @@ p2 <- counts %>%
   geom_violin(draw_quantiles = c(0.5)) +
   scale_y_log10() +
   scale_fill_discrete('ORF caller') +
+  xlab('') +
   coord_flip()
 
 ( p0 + p1 ) / p2 +
@@ -685,7 +688,7 @@ p2 <- counts %>%
 
 ```{r fig-mst-1-annot-success}
 #| label: fig-mst-1-annot-success
-#| fig.height: 10
+#| fig.height: 8
 #| fig-cap: '**Annotation success.** A) GTDB taxonomy and B) combinations of functional annotation. Unweighted, weighted by count and tpm respectively.'
 
 p0 <- eukulele %>%
@@ -755,7 +758,7 @@ p1 <- func_annots %>%
 
 p0 / p1 +
   plot_annotation(tag_levels = 'A') +
-  plot_layout(heights = c(2,1))
+  plot_layout(heights = c(2.8,1))
 ```
 
 ### What's the matter with NA2?
@@ -886,7 +889,7 @@ p0 / p1 +
 #| fig-cap: '**Annotation comparison** A) Eggnogs COG category and B) SEED category from original paper.'
 #| cache-lazy: false
 
-# it makes easier to compare one type of run with the original function annotation. 
+# it makes easier to compare one type of run with the original function annotation.
 # we can have as supplementary figures a plot with all the combination.
 # here I will plot megahit.prokka.without_bbnorm vs original paper
 
@@ -902,7 +905,7 @@ counts.eggnogs <- counts %>%
   mutate(sample = if_else(grepl("NB2", sample), 'Hcc', sample)) %>%
   group_by(project, run, assembler, orf_caller, bbnorm, minlen, sample, orf) %>%
   summarise(m_tpm = mean(tpm),
-            sd = sd(tpm), 
+            sd = sd(tpm),
             .groups = 'drop') %>%
   left_join( eggnogs, by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) ) %>%
   mutate(cog_category = replace(cog_category, cog_category == 'A', 'RNA_process')) %>%
@@ -968,12 +971,12 @@ p3 <- ( counts.eggnogs %>%
 ```
 
 ```{r mst spades prodigal - functional annotation table - selected genes, echo = FALSE, warning = FALSE}
-# check the same genes that are DE in MST paper
-# nqrB atpC ccoN nqrE pet (there are severals type), ccmC, sdhd, coxN, mxaF, rhodopsin (change in prd), psaC, psbC, actP, secD, secE, multidrug transport system (change in mtsp), dicarboxylate transport system (change in ttdt), PFAM Sodium sulphate symporter (change in str), dctM (in pfam), nucleoside transporter (change in nucT), pyrophosphate-specific outer membrane porin (change in oprO)
+# # check the same genes that are DE in MST paper
+# # nqrB atpC ccoN nqrE pet (there are severals type), ccmC, sdhd, coxN, mxaF, rhodopsin (change in prd), psaC, psbC, actP, secD, secE, multidrug transport system (change in mtsp), dicarboxylate transport system (change in ttdt), PFAM Sodium sulphate symporter (change in str), dctM (in pfam), nucleoside transporter (change in nucT), pyrophosphate-specific outer membrane porin (change in oprO)
 
 # create the dataframe
 # rename those values in the column that are not correct
-counts.eggnogs.selectedgenes <- counts.eggnogs %>% 
+counts.eggnogs.selectedgenes <- counts.eggnogs %>%
   mutate(preferred_name = recode( preferred_name, "pet.*"= "pet")) %>%
   mutate(preferred_name = if_else(grepl("DctM.*", pfams), "dctM", preferred_name)) %>%
   mutate(preferred_name = if_else(grepl("*Bacteriorhodopsin*", description), "prd", preferred_name)) %>%
@@ -1022,6 +1025,7 @@ p5 <- counts.eggnogs.selectedgenes %>%
 #| fig.height: 6
 #| fig-cap: '**Edger output** A) eggnogs that have differencial expression according to EdgeR output'
 #| cache-lazy: false
+#| include: false
 
 p6 <- edger %>%
   filter(PValue < 0.01) %>%
@@ -1134,10 +1138,10 @@ p7 <- ( counts.tax %>%
         legend.key.height = unit(0.5, "cm")) +
     geom_col(width= .70, colour="black") +
     ylab("Transcripts per million") +
-    labs(fill = "Family", y = "TPM (x10^5)", x = NULL)
+    labs(fill = "Family", y = "CPM (x10^5)", x = NULL)
   )
 
-(p3 / (p5 + p6) ) / p7 + plot_annotation(tag_levels = 'A')
+(p7 / p3 / (p5 + p6) ) + plot_annotation(tag_levels = 'A')
 ```
 
 # Discussion
