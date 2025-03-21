@@ -387,47 +387,6 @@ func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = '
   unite(combination, c(eggnog, kofam, prokka), sep = '+', na.rm = TRUE)
 ```
 
-```{r hellinger-pcas}
-#| label: hellinger-pcas
-#| eval: false
-# hellinger_pca <- function(ds) {
-#   ds %>%
-#     group_by(sample, variable) %>%
-#     summarise(count = sum(count), .groups = 'drop') %>%
-#     pivot_wider(names_from = variable, values_from = count, values_fill = 0) %>%
-#     as.data.frame() %>%
-#     column_to_rownames('sample') %>%
-#     vegan::decostand(method = 'hellinger') %>%
-#     vegan::rda()
-# }
-# pcas <- list()
-# for ( r in counts %>% distinct(run) %>% filter(str_detect(run, 'without_bbnorm')) %>% pull(run) ) {
-#   pcas[[sprintf("%s-eggnogs", r)]] <- counts %>% 
-#     filter(run == r) %>%
-#     inner_join(
-#       eggnogs %>%
-#         select(project, run, eggnog_ogs, orf) %>%
-#         separate_rows(eggnog_ogs, sep = ',') %>%
-#         separate(eggnog_ogs, c('eggnog', 'taxon'), sep = '@') %>%
-#         filter(taxon == '1|root') %>%
-#         select(-taxon) %>%
-#         distinct(run, orf, .keep_all = TRUE),
-#       by = join_by(project, run, orf)
-#     ) %>%
-#     rename(variable = eggnog) %>%
-#     hellinger_pca()
-#   pcas[[sprintf("%s-families", r)]] <- counts %>% 
-#     filter(run == r) %>% 
-#     inner_join(
-#       eukulele %>%
-#         select(project, run, orf, domain:species),
-#       by = join_by(project, run, orf)
-#     ) %>%
-#     rename(variable = family) %>%
-#     hellinger_pca()
-# }
-```
-
 ```{r tax-annots-og}
 #| label: tax-annots-og
 #| cache-lazy: false
