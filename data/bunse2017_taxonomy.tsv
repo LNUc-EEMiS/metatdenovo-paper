@@ -1,0 +1,29 @@
+sample_group	family	cpm
+Lca	Other Flavobacteria	10000
+Lca	Flavobacteriaceae	50000
+Lca	Other Gammaproteobacteria	230000
+Lca	Alteromonadaceae	240000
+Lca	Other Alphaproteobacteria	30000
+Lca	SAR11 clade	40000
+Lca	Rhodobacteraceae	10000
+Lcc	Other Flavobacteria	10000
+Lcc	Flavobacteriaceae	50000
+Lcc	Other Gammaproteobacteria	230000
+Lcc	Alteromonadaceae	230000
+Lcc	Other Alphaproteobacteria	50000
+Lcc	SAR11 clade	20000
+Lcc	Rhodobacteraceae	10000
+Hca	Other Flavobacteria	30000
+Hca	Flavobacteriaceae	50000
+Hca	Other Gammaproteobacteria	250000
+Hca	Alteromonadaceae	70000
+Hca	Other Alphaproteobacteria	40000
+Hca	SAR11 clade	10000
+Hca	Rhodobacteraceae	10000
+Hcc	Other Flavobacteria	10000
+Hcc	Flavobacteriaceae	70000
+Hcc	Other Gammaproteobacteria	250000
+Hcc	Alteromonadaceae	170000
+Hcc	Other Alphaproteobacteria	90000
+Hcc	SAR11 clade	20000
+Hcc	Rhodobacteraceae	20000

@@ -1,0 +1,53 @@
+sample_group	seed	cpm
+Lca	Protein metabolism	290000
+Lca	Clustering-based subsystem	180000
+Lca	RNA Metabolism	90000
+Lca	Membrane Transport	110000
+Lca	Carbohydrates	80000
+Lca	Miscellaneous	88000
+Lca	Amino Acids and Derivates	70000
+Lca	Respiration	88000
+Lca	Cofactors, vitamins, Pigments	50000
+Lca	Iron acquisition and mtabolism	50000
+Lca	Nucleosiles and Nucleotides	30000
+Lca	Fatty Acids	15000
+Lca	Photosynthesis	35000
+Lcc	Protein metabolism	330000
+Lcc	Clustering-based subsystem	200000
+Lcc	RNA Metabolism	100000
+Lcc	Membrane Transport	100000
+Lcc	Carbohydrates	82000
+Lcc	Miscellaneous	89000
+Lcc	Amino Acids and Derivates	72000
+Lcc	Respiration	72000
+Lcc	Cofactors, vitamins, Pigments	52000
+Lcc	Iron acquisition and mtabolism	48000
+Lcc	Nucleosiles and Nucleotides	33000
+Lcc	Fatty Acids	17000
+Lcc	Photosynthesis	30000
+Hca	Protein metabolism	290000
+Hca	Clustering-based subsystem	240000
+Hca	RNA Metabolism	85000
+Hca	Membrane Transport	85000
+Hca	Carbohydrates	96000
+Hca	Miscellaneous	78000
+Hca	Amino Acids and Derivates	80000
+Hca	Respiration	70000
+Hca	Cofactors, vitamins, Pigments	57000
+Hca	Iron acquisition and mtabolism	45000
+Hca	Nucleosiles and Nucleotides	40000
+Hca	Fatty Acids	25000
+Hca	Photosynthesis	15000
+Hcc	Protein metabolism	310000
+Hcc	Clustering-based subsystem	220000
+Hcc	RNA Metabolism	88000
+Hcc	Membrane Transport	88000
+Hcc	Carbohydrates	97000
+Hcc	Miscellaneous	88000
+Hcc	Amino Acids and Derivates	78000
+Hcc	Respiration	77000
+Hcc	Cofactors, vitamins, Pigments	56000
+Hcc	Iron acquisition and mtabolism	46000
+Hcc	Nucleosiles and Nucleotides	35000
+Hcc	Fatty Acids	30000
+Hcc	Photosynthesis	20000

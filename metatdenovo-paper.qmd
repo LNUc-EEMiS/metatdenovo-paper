@@ -84,20 +84,10 @@ post_process_table <- function(paths) {
 }
 ```
 
-```{r create-samples}
-#| label: create-samples
+```{r read-samples}
+#| label: read-samples
 
-samples <- tribble(
-  ~sample, ~treatment, ~replicate,
-  'KA1',   'control_acidified', '1',
-  'KA2',   'control_acidified', '2',
-  'KB1',   'control_nonacidified', '1',
-  'KB2',   'control_nonacidified', '2',
-  'NA1',   'nutrients_acidified', '1',
-  'NA2',   'nutrients_acidified', '2',
-  'NB1',   'nutrients_nonacidified', '1',
-  'NB2',   'nutrients_nonacidified', '2' 
-)
+samples <- read_tsv('data/samples.tsv', col_types = 'ccic')
 ```
 
 ```{r read-execution-traces}
@@ -387,32 +377,18 @@ func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = '
   unite(combination, c(eggnog, kofam, prokka), sep = '+', na.rm = TRUE)
 ```
 
-```{r tax-annots-og}
-#| label: tax-annots-og
+```{r read-bunse2017-taxonomy}
+#| label: read-bunse2017-taxonomy
 #| cache-lazy: false
 
-# DL: It would be better to have this and the next one in tables that we read in.
-original.tax <- tibble(
-  sample = c(rep("Lca",7), rep("Lcc",7), rep("Hca",7), rep("Hcc",7)),
-  family = c(rep(c("Other Flavobacteria", "Flavobacteriaceae", "Other Gammaproteobacteria", "Alteromonadaceae", "Other Alphaproteobacteria", "SAR11 clade", "Rhodobacteraceae"),4)),
-  tpm = c(0.1, 0.5, 2.3, 2.4, 0.3, 0.4, 0.1,
-          0.1, 0.5, 2.3, 2.3, 0.5, 0.2, 0.1,
-          0.3, 0.5, 2.5, 0.7, 0.4, 0.1, 0.1,
-          0.1, 0.7, 2.5, 1.7, 0.9, 0.2, 0.2)
-  )
+bunse2017_taxonomy <- read_tsv('data/bunse2017_taxonomy.tsv', col_types = 'cci')
 ```
 
-```{r func-annots-og}
-#| label: func-annots-og
+```{r read-bunse2017-function}
+#| label: read-bunse2017-function
 #| cache-lazy: false
 
-original.fun <- tibble(
-  sample = c(rep("Lca",13), rep("Lcc",13), rep("Hca",13), rep("Hcc",13)),
-  SEED = c(rep(c("Protein metabolism", "Clustering-based subsystem", "RNA Metabolism", "Membrane Transport", "Carbohydrates", "Miscellaneous", "Amino Acids and Derivates", "Respiration", "Cofactors, vitamins, Pigments", "Iron acquisition and mtabolism", "Nucleosiles and Nucleotides", "Fatty Acids", "Photosynthesis"),4)),
-  tpm = c(2.9, 1.8, 0.9, 1.1, 0.8, 0.88, 0.70, 0.88, 0.5, 0.5, 0.3, 0.15, 0.35,
-          3.3, 2, 1, 1, 0.82, 0.89, 0.72, 0.72, 0.52, 0.48, 0.33, 0.17, 0.3,
-          2.9, 2.4, 0.85, 0.85, 0.96, 0.78, 0.80, 0.70, 0.57, 0.45, 0.4, 0.25, 0.15,
-          3.1, 2.2, 0.88, 0.88, 0.97, 0.88, 0.78, 0.77, 0.56, 0.46, 0.35, 0.3, 0.2))
+bunse2017_function <- read_tsv('data/bunse2017_function.tsv', col_types = 'cci')
 ```
 
 # Version history
@@ -795,52 +771,51 @@ p0 / p1 +
 
 ### Functional and taxonomic annotation - comparison with original data
 
-```{r fig-mst-1-family-pcas}
-#| label: fig-mst-1-family-pcas
-#| fig-cap: '**MST-1 PCAs based on data summed at family.**'
-#| include: false
+```{r fig-ms1-comparison}
+#| label: fig-mst1-comparison
 
-# plot_pca <- function(pca, t) {
-#   e <- pca$eig
-#   
-#   pca$u %>%
-#     as.data.frame() %>%
-#     rownames_to_column('sample') %>%
-#     inner_join(samples, by = join_by(sample)) %>%
-#     ggplot(aes(x = PC1, y = PC2, colour = treatment, shape = replicate)) +
-#     geom_point() +
-#     #scale_colour_brewer('Sample', palette = 'Paired') +
-#     xlab(sprintf("PC1 (%2.1f%%)", pca$eig[['PC1']]/sum(pca$eig) * 100)) +
-#     ylab(sprintf("PC2 (%2.1f%%)", pca$eig[['PC2']]/sum(pca$eig) * 100)) +
-#     ggtitle(t)
-# }
-# 
-# p0 <- pcas[['megahit.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
-# p1 <- pcas[['megahit.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
-# p2 <- pcas[['spades.prokka.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prokka')
-# p3 <- pcas[['spades.prodigal.without_bbnorm-families']][['CA']] %>% plot_pca('RNASpades/Prodigal')
-# 
-# ( p0 + p1 ) /
-#   ( p2 + p3 ) +
-#   plot_layout(guides = 'collect')
+TAXON_COLOURS <- c(
+  'Other Flavobacteria'       = '#BA2519',
+  'Flavobacteriaceae'         = '#69D7F4',
+  'Other Gammaproteobacteria' = '#F8E53F',
+  'Alteromonadaceae'          = '#637DB0',
+  'Other Alphaproteobacteria' = '#113484',
+  'SAR11 clade'               = '#45CBD9',
+  'Thalassospiraceae'         = '#4e3484',
+  'Pelagibacteraceae'         = '#45CBD9',
+  'Rhodobacteraceae'          = '#CCD1A3'
+)
+
+eukulele %>%
+  filter(family %in% names(TAXON_COLOURS)) %>%
+  union(
+    eukulele %>% filter(class == 'Alphaproteobacteria', ! family %in% names(TAXON_COLOURS)) %>% mutate(family = 'Other Alphaproteobacteria')
+  ) %>%
+  union(
+    eukulele %>% filter(class == 'Gammaproteobacteria', ! family %in% names(TAXON_COLOURS)) %>% mutate(family = 'Other Gammaproteobacteria')
+  ) %>%
+  union(
+    eukulele %>% filter(order == 'Flavobacteriales', ! family %in% names(TAXON_COLOURS)) %>% mutate(family = 'Other Flavobacteria')
+  ) %>%
+  inner_join(
+    counts %>% filter(run == 'megahit.prokka.without_bbnorm'),
+    by = join_by(project, run, assembly, assembler, orf_caller, bbnorm, minlen, orf)
+  ) %>%
+  inner_join(samples, by = join_by(sample)) %>%
+  group_by(sample_group, family, sample) %>%
+  summarise(tpm = sum(tpm), .groups = 'drop_last') %>%
+  summarise(tpm = mean(tpm), .groups = 'drop') %>%
+  transmute(sample_group, family, value = tpm, method = 'nf-core/metadenovo') %>%
+  union(
+    bunse2017_taxonomy %>% transmute(sample_group, family, value = cpm, method = 'Bunse et al. 2017')
+  ) %>%
+  mutate(family = factor(family, names(TAXON_COLOURS), ordered = TRUE)) %>%
+  ggplot(aes(x = sample_group, y = value, fill = family)) +
+  geom_col() +
+  scale_fill_manual('Family', values = TAXON_COLOURS) +
+  facet_wrap(~method) +
+  xlab('') + ylab('Rel. abundance')
 ```
-
-```{r mst-1-eggnog-pcas}
-#| label: mst-1-eggnog-pcas
-#| fig-cap: '**MST-1 PCAs based on data summed at the root EGGNOG.**'
-#| include: false
-
-# p0 <- pcas[['megahit.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prokka')
-# p1 <- pcas[['megahit.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('MEGAHIT/Prodigal')
-# p2 <- pcas[['spades.prokka.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prokka')
-# p3 <- pcas[['spades.prodigal.without_bbnorm-eggnogs']][['CA']] %>% plot_pca('RNASpades/Prodigal')
-# 
-# ( p0 + p1 ) /
-#   ( p2 + p3 ) +
-#   plot_layout(guides = 'collect')
-```
-
-### Functional annotation - comparison with original data
 
 ```{r fig-mst-1-func-annot-comparison}
 #| label: fig-mst-1-func-annot-comparison
@@ -1021,86 +996,6 @@ p6 <- edger %>%
     sec.axis = sec_axis(~ ., name = "logFC")
   ) +
   theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6))
-```
-
-```{r fig-mst-1-tax-annot-comparison}
-#| label: fig-mst-1-tax-annot-comparison
-#| warning: false
-#| fig.height: 10
-#| fig-cap: '**Funcional and taxonomical annotation comparison** A) Eggnogs COG category and B) SEED category from original paper. C) Genes found with nf-core/metatdenovo and original paper. D) eggnogs that have differencial expression according to EdgeR output. E) GTDB database from nf-core/metatdenovo and F) taxonomy from original paper.'
-#| cache-lazy: false
-
-# it makes easier to compare one type of run with the original annotation. 
-# we can have as supplementary figures a plot with all the combination.
-# here I will plot megahit.prokka.without_bbnorm vs original paper
-
-# join taxonomy and counts
-counts.tax <- counts %>%
-  mutate(sample = if_else(grepl("KA1", sample), 'Lca', sample)) %>%
-  mutate(sample = if_else(grepl("KA2", sample), 'Lca', sample)) %>%
-  mutate(sample = if_else(grepl("NA1", sample), 'Hca', sample)) %>%
-  mutate(sample = if_else(grepl("NA2", sample), 'Hca', sample)) %>%
-  mutate(sample = if_else(grepl("KB1", sample), 'Lcc', sample)) %>%
-  mutate(sample = if_else(grepl("KB2", sample), 'Lcc', sample)) %>%
-  mutate(sample = if_else(grepl("NB1", sample), 'Hcc', sample)) %>%
-  mutate(sample = if_else(grepl("NB2", sample), 'Hcc', sample)) %>%
-  group_by(project, run, assembler, orf_caller, bbnorm, minlen, sample, orf) %>%
-  summarise(m_tpm = mean(tpm),
-            sd = sd(tpm), 
-            .groups = 'drop') %>%
-  left_join( eukulele, by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) ) %>%
-  filter( run == 'megahit.prokka.without_bbnorm')
-counts.tax$family[is.na(counts.tax$family)] <- 'uncl.'
-
-# calculate tpms Family level for bacteria
-# top 7 family
-top7_family <- counts.tax %>%
-  filter( family != 'uncl.') %>%
-  group_by(family) %>%
-  summarise(tpm = sum(m_tpm), .groups = 'drop') %>%
-  slice_max(tpm, n = 7) %>%
-  select(-tpm)
-  
-RANKS.family.tax = c('Schleiferiaceae', 'Flavobacteriaceae', 'Pseudohongiellaceae', 'Alteromonadaceae', 'Thalassospiraceae', 'Pelagibacteraceae', 'Rhodobacteraceae')
-matchcol.taxonomy <- c( "#962d19", "#BA5019", "#f8b53f",
-                                   "#bae53f", "#4e3484", "#4e4e84", "#675084")
-RANKS.original.tax = c("Other Flavobacteria", "Flavobacteriaceae", "Other Gammaproteobacteria", "Alteromonadaceae", "Other Alphaproteobacteria", "SAR11 clade", "Rhodobacteraceae")
-
-matchingcolors.original.tax <- c("#952720", "#BA5019", "#F8E53F",
-                                 "#bae53f", "#113484", "#115084","#675084")
-# Schleiferiaceae     = #962d19
-# Flavobacteriaceae   = #BA5019
-# Pseudohongiellaceae = #f8b53f
-# Alteromonadaceae    = #bae53f
-# Thalassospiraceae   = #4e3484
-# Pelagibacteraceae   = #4e4e84
-# Rhodobacteraceae    = #675084
-
-p7 <- ( counts.tax %>%
-  inner_join(top7_family, by = "family") %>%
-  group_by(sample, family) %>%
-  summarise(sum_tpm = sum(m_tpm)/10^5, .groups = 'drop') %>%
-  ggplot(aes(x = sample, y = sum_tpm, fill = factor(family, levels = RANKS.family.tax))) +
-  scale_fill_manual(values = matchcol.taxonomy) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
-        legend.position = 'none') +
-  ylab("Transcripts per million") +
-  scale_y_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
-  geom_col(width= .70, colour="black") +
-  labs(x = NULL, fill = "Family", y ="TPM (x10^5)") ) +
-  ( original.tax %>%
-    ggplot(aes(x = sample, y = tpm, fill = factor(family, levels = RANKS.original.tax))) +
-    scale_fill_manual(values = matchingcolors.original.tax) +
-    scale_y_continuous(breaks = seq(0, 8, by = 2), limits = c(0, 8)) +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
-          legend.key.width = unit(0.5, "cm"),
-        legend.key.height = unit(0.5, "cm")) +
-    geom_col(width= .70, colour="black") +
-    ylab("Transcripts per million") +
-    labs(fill = "Family", y = "CPM (x10^5)", x = NULL)
-  )
-
-(p7 / p3 / (p5 + p6) ) + plot_annotation(tag_levels = 'A')
 ```
 
 # Discussion
