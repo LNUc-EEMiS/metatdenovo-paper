@@ -317,6 +317,12 @@ eggnogs.edger <- read_tsv(
   ungroup()
 ```
 
+```{r read-cog-categories}
+#| label: read-cog-categories
+
+cog_categories <- read_tsv('data/cog_categories.tsv', col_types = 'cc')
+```
+
 ```{r read-kofams}
 #| label: read-kofams
 #| cache-lazy: false
@@ -377,18 +383,18 @@ func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = '
   unite(combination, c(eggnog, kofam, prokka), sep = '+', na.rm = TRUE)
 ```
 
-```{r read-bunse2017-taxonomy}
-#| label: read-bunse2017-taxonomy
+```{r read-bunse2016-taxonomy}
+#| label: read-bunse2016-taxonomy
 #| cache-lazy: false
 
-bunse2017_taxonomy <- read_tsv('data/bunse2017_taxonomy.tsv', col_types = 'cci')
+bunse2016_taxonomy <- read_tsv('data/bunse2016_taxonomy.tsv', col_types = 'cci')
 ```
 
-```{r read-bunse2017-function}
-#| label: read-bunse2017-function
+```{r read-bunse2016-function}
+#| label: read-bunse2016-function
 #| cache-lazy: false
 
-bunse2017_function <- read_tsv('data/bunse2017_function.tsv', col_types = 'cci')
+bunse2016_function <- read_tsv('data/bunse2016_function.tsv', col_types = 'cci')
 ```
 
 # Version history
@@ -773,6 +779,8 @@ p0 / p1 +
 
 ```{r fig-ms1-comparison}
 #| label: fig-mst1-comparison
+#| fig-height: 8
+#| fig-width: 10
 
 TAXON_COLOURS <- c(
   'Other Flavobacteria'       = '#BA2519',
@@ -786,7 +794,7 @@ TAXON_COLOURS <- c(
   'Rhodobacteraceae'          = '#CCD1A3'
 )
 
-eukulele %>%
+p0 <- eukulele %>%
   filter(family %in% names(TAXON_COLOURS)) %>%
   union(
     eukulele %>% filter(class == 'Alphaproteobacteria', ! family %in% names(TAXON_COLOURS)) %>% mutate(family = 'Other Alphaproteobacteria')
@@ -807,7 +815,7 @@ eukulele %>%
   summarise(tpm = mean(tpm), .groups = 'drop') %>%
   transmute(sample_group, family, value = tpm, method = 'nf-core/metadenovo') %>%
   union(
-    bunse2017_taxonomy %>% transmute(sample_group, family, value = cpm, method = 'Bunse et al. 2017')
+    bunse2016_taxonomy %>% transmute(sample_group, family, value = cpm, method = 'Bunse et al. 2016')
   ) %>%
   mutate(family = factor(family, names(TAXON_COLOURS), ordered = TRUE)) %>%
   ggplot(aes(x = sample_group, y = value, fill = family)) +
@@ -815,142 +823,97 @@ eukulele %>%
   scale_fill_manual('Family', values = TAXON_COLOURS) +
   facet_wrap(~method) +
   xlab('') + ylab('Rel. abundance')
+
+eggnogs %>%
+  filter(run == 'megahit.prokka.without_bbnorm') %>%
+  distinct(run, orf, cog_category) %>%
+  separate_rows(cog_category, sep = '') %>%
+  filter(cog_category != '') %>%
+  filter(!cog_category %in% c('-', 'S')) %>%
+  inner_join(counts, by = join_by(run, orf), relationship = 'many-to-many') %>%
+  group_by(sample, cog_category) %>%
+  summarise(tpm = sum(tpm), .groups = 'drop') %>%
+  inner_join(cog_categories, by = join_by(cog_category)) -> t
+
+p1 <- t %>%
+  inner_join(samples, by = join_by(sample)) %>%
+  group_by(category_name, sample_group) %>%
+  summarise(value = mean(tpm), .groups = 'drop') %>%
+  mutate(method = 'nf-core/metadenovo') %>%
+  union(
+    bunse2016_function %>% transmute(sample_group, category_name = seed, value = cpm, method = 'Bunse et al. 2016')
+  ) %>%
+  mutate(
+    category_name = factor(
+      category_name,
+      union(
+        t %>% rename(c = category_name) %>% group_by(c) %>% summarise(v = mean(tpm)),
+        bunse2016_function %>% rename(c = seed) %>% group_by(c) %>% summarise(v = mean(cpm))
+      ) %>%
+        arrange(desc(v)) %>%
+        pull(c),
+      ordered = TRUE
+    )
+  ) %>%
+  ggplot(aes(x = category_name, y = value, fill = sample_group)) +
+  geom_col(position = 'dodge') +
+  scale_fill_discrete('Sample group') +
+  facet_wrap(~method, scales = 'free') +
+  xlab('') + ylab('Rel. abundance') +
+  theme(
+    axis.text.x = element_text(angle = 65, hjust = 1)
+  )
+
+p0 / p1 +
+  plot_annotation(tag_levels = 'A')
 ```
-
-```{r fig-mst-1-func-annot-comparison}
-#| label: fig-mst-1-func-annot-comparison
-#| fig.height: 6
-#| fig-cap: '**Annotation comparison** A) Eggnogs COG category and B) SEED category from original paper.'
-#| cache-lazy: false
-
-# it makes easier to compare one type of run with the original function annotation.
-# we can have as supplementary figures a plot with all the combination.
-# here I will plot megahit.prokka.without_bbnorm vs original paper
-
-# Classification by COG category
-counts.eggnogs <- counts %>%
-  mutate(sample = if_else(grepl("KA1", sample), 'Lca', sample)) %>%
-  mutate(sample = if_else(grepl("KA2", sample), 'Lca', sample)) %>%
-  mutate(sample = if_else(grepl("NA1", sample), 'Hca', sample)) %>%
-  mutate(sample = if_else(grepl("NA2", sample), 'Hca', sample)) %>%
-  mutate(sample = if_else(grepl("KB1", sample), 'Lcc', sample)) %>%
-  mutate(sample = if_else(grepl("KB2", sample), 'Lcc', sample)) %>%
-  mutate(sample = if_else(grepl("NB1", sample), 'Hcc', sample)) %>%
-  mutate(sample = if_else(grepl("NB2", sample), 'Hcc', sample)) %>%
-  group_by(project, run, assembler, orf_caller, bbnorm, minlen, sample, orf) %>%
-  summarise(m_tpm = mean(tpm),
-            sd = sd(tpm),
-            .groups = 'drop') %>%
-  left_join( eggnogs, by = join_by(project, run, assembler, orf_caller, bbnorm, minlen, orf) ) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'A', 'RNA_process')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'B', 'Chromatin_Struc')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'C', 'Energy_prod')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'D', 'Cell_cycle')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'E', 'AA_metab')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'F', 'Nucl_metab')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'G', 'Carbohy_metab')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'H', 'Coenz_metab')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'I', 'Lipid_metab')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'J', 'Tranlsation')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'K', 'Transcription')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'L', 'Replication')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'M', 'Cell_wall')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'N', 'Cell_motility')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'O', 'Post-transl_mod')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'P', 'Inorg_ion_transp')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'Q', 'Sec_Structure')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'T', 'Signal_Transduc')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'U', 'Intracel_traf')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'Y', 'Nucl_structure')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'Z', 'Cytoskeleton')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'R', 'Gen_Func')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == 'S', 'Func_unknown')) %>%
-  mutate(cog_category = replace(cog_category, cog_category == '-', 'Func_unknown'))
-
-top13cog <- counts.eggnogs %>%
-  #filter( cog_category != '(S)Func_unknown') %>%
-  group_by(cog_category, sample) %>%
-  summarise(tpm = sum(m_tpm),  .groups = 'drop_last') %>%
-  summarise(mean_tpm = mean(tpm), .groups = 'drop') %>%
-  slice_max(mean_tpm, n = 13) %>%
-  na.omit()
-
-# top 13 expressed COG category divided by samples
-p3 <- ( counts.eggnogs %>%
-    as_tibble() %>%
-    inner_join(top13cog, by = 'cog_category') %>%
-    group_by(run, sample, cog_category) %>%
-    summarise(tpm = sum(m_tpm)/10^5, .groups = 'drop') %>%
-    mutate(cog_category = reorder(cog_category, -tpm)) %>%
-    na.omit() %>%
-    filter( run == 'megahit.prokka.without_bbnorm') %>%
-    ggplot(aes(x = cog_category, y = tpm)) +
-    theme(
-          legend.position = 'null') +
-    scale_fill_manual(values = mst1.samples.color) +
-    geom_col(aes(fill = sample), position = 'dodge', colour = 'Black') +
-    labs(x = "", y = "TPM(x10^5)") +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7)) ) +
-  ( original.fun %>%
-    as_tibble() %>%
-    group_by(sample, SEED) %>%
-    summarise(tpm = sum(tpm), .groups = 'drop') %>%
-    mutate(SEED = reorder(SEED, -tpm)) %>%
-    na.omit() %>%
-    ggplot(aes(x = SEED, y = tpm)) +
-      scale_fill_manual(values = mst1.samples.color) +
-      geom_col(aes(fill = sample), position = 'dodge', colour = 'Black') +
-      labs(y = "TPM(x10^5)", x = "") +
-      theme(axis.text.x = element_text(angle = 45, hjust = 1, size = 7)) )
-```
-
 ```{r mst spades prodigal - functional annotation table - selected genes, echo = FALSE, warning = FALSE}
-# # check the same genes that are DE in MST paper
-# # nqrB atpC ccoN nqrE pet (there are severals type), ccmC, sdhd, coxN, mxaF, rhodopsin (change in prd), psaC, psbC, actP, secD, secE, multidrug transport system (change in mtsp), dicarboxylate transport system (change in ttdt), PFAM Sodium sulphate symporter (change in str), dctM (in pfam), nucleoside transporter (change in nucT), pyrophosphate-specific outer membrane porin (change in oprO)
-
-# create the dataframe
-# rename those values in the column that are not correct
-counts.eggnogs.selectedgenes <- counts.eggnogs %>%
-  mutate(preferred_name = recode( preferred_name, "pet.*"= "pet")) %>%
-  mutate(preferred_name = if_else(grepl("DctM.*", pfams), "dctM", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*Bacteriorhodopsin*", description), "prd", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("PFAM Sodium sulphate symporter", description), "str", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*dicarboxylate transport system*", description), "ttdt", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*nucleoside transporter*", description), "nucT", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*pyrophosphate-specific outer membrane porin*", description), "oprO", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*multidrug transport system*", description), "mtsp", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*Zn-dependent protease with chaperone function*", description), "pcf", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*PQQ-like domain*", description), "mxaF", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*Low-potential electron donor to a number of redox enzymes*", description), "fld", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*tail specific protease*", description), "cpt", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*Belongs to the peptidase S41A family*", description), "ctp", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*Peptidase, S41 family*", description), "ctp", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*chemotaxis, protein*", description), "ctp", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*rbc*", preferred_name), "rbc", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*Molybdopterin oxidoreductase Fe4S4 domain*", description), "mor", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*Flagellar regulatory protein FleQ*", description), "fleq", preferred_name)) %>%
-  mutate(preferred_name = if_else(grepl("*Haemolysin-type calcium-binding repeat (2 copies)*", description), "hcbr", preferred_name)) %>%
-  as_tibble() %>%
-  group_by(sample, preferred_name) %>%
-  summarise(tpm = sum(m_tpm), .groups = 'drop') %>%
-  na.omit() %>%
-  filter( sample %in% c("Lca", "Lcc")) %>%
-  filter( preferred_name %in% c("atpC", "nqrB", "ccoN", "nqrE", "ccmC", "sdhD", "coxN", "mxaF", "pet", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr") )
-
-# create the order for the x-axis as the same as in the original paper
-counts.eggnogs.selectedgenes$preferred_name <- factor(counts.eggnogs.selectedgenes$preferred_name, levels = c("nqrB", "atpC", "ccoN", "nqrE", "pet", "ccmC", "sdhD", "coxN", "mxaF", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr"))
-
-setcol <- c( "red", "dark green")
-# plot the result
-p5 <- counts.eggnogs.selectedgenes %>%
-  filter( preferred_name != "str") %>%
-  ggplot(aes(x = preferred_name, y = tpm, fill = sample )) +
-  geom_col(position = "dodge", color = "black") +
-  scale_fill_manual(values = setcol) +
-  scale_y_log10(limits = c(1, 1e6)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10)) +
-  theme(legend.position = 'none') +
-  labs(x = "", y = "tpm")
+# # # check the same genes that are DE in MST paper
+# # # nqrB atpC ccoN nqrE pet (there are severals type), ccmC, sdhd, coxN, mxaF, rhodopsin (change in prd), psaC, psbC, actP, secD, secE, multidrug transport system (change in mtsp), dicarboxylate transport system (change in ttdt), PFAM Sodium sulphate symporter (change in str), dctM (in pfam), nucleoside transporter (change in nucT), pyrophosphate-specific outer membrane porin (change in oprO)
+# 
+# # create the dataframe
+# # rename those values in the column that are not correct
+# counts.eggnogs.selectedgenes <- counts.eggnogs %>%
+#   mutate(preferred_name = recode( preferred_name, "pet.*"= "pet")) %>%
+#   mutate(preferred_name = if_else(grepl("DctM.*", pfams), "dctM", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*Bacteriorhodopsin*", description), "prd", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("PFAM Sodium sulphate symporter", description), "str", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*dicarboxylate transport system*", description), "ttdt", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*nucleoside transporter*", description), "nucT", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*pyrophosphate-specific outer membrane porin*", description), "oprO", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*multidrug transport system*", description), "mtsp", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*Zn-dependent protease with chaperone function*", description), "pcf", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*PQQ-like domain*", description), "mxaF", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*Low-potential electron donor to a number of redox enzymes*", description), "fld", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*tail specific protease*", description), "cpt", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*Belongs to the peptidase S41A family*", description), "ctp", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*Peptidase, S41 family*", description), "ctp", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*chemotaxis, protein*", description), "ctp", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*rbc*", preferred_name), "rbc", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*Molybdopterin oxidoreductase Fe4S4 domain*", description), "mor", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*Flagellar regulatory protein FleQ*", description), "fleq", preferred_name)) %>%
+#   mutate(preferred_name = if_else(grepl("*Haemolysin-type calcium-binding repeat (2 copies)*", description), "hcbr", preferred_name)) %>%
+#   as_tibble() %>%
+#   group_by(sample, preferred_name) %>%
+#   summarise(tpm = sum(m_tpm), .groups = 'drop') %>%
+#   na.omit() %>%
+#   filter( sample %in% c("Lca", "Lcc")) %>%
+#   filter( preferred_name %in% c("atpC", "nqrB", "ccoN", "nqrE", "ccmC", "sdhD", "coxN", "mxaF", "pet", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr") )
+# 
+# # create the order for the x-axis as the same as in the original paper
+# counts.eggnogs.selectedgenes$preferred_name <- factor(counts.eggnogs.selectedgenes$preferred_name, levels = c("nqrB", "atpC", "ccoN", "nqrE", "pet", "ccmC", "sdhD", "coxN", "mxaF", "dctM", "prd", "ttdt", "nucT", "oprO", "mtsp", "pcf", "fld", "ctp", "rbc", "mor", "mraY", "hcbr"))
+# 
+# setcol <- c( "red", "dark green")
+# # plot the result
+# p5 <- counts.eggnogs.selectedgenes %>%
+#   filter( preferred_name != "str") %>%
+#   ggplot(aes(x = preferred_name, y = tpm, fill = sample )) +
+#   geom_col(position = "dodge", color = "black") +
+#   scale_fill_manual(values = setcol) +
+#   scale_y_log10(limits = c(1, 1e6)) +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 10)) +
+#   theme(legend.position = 'none') +
+#   labs(x = "", y = "tpm")
 ```
 
 ```{r fig-edgeR-analysis}
@@ -961,41 +924,41 @@ p5 <- counts.eggnogs.selectedgenes %>%
 #| cache-lazy: false
 #| include: false
 
-p6 <- edger %>%
-  filter(PValue < 0.01) %>%
-  filter(logFC > 1.5) %>%
-  filter(contrast == 'KA-KB') %>%
-  inner_join((eggnogs.edger %>%
-               select(-orf) %>%
-               distinct()) %>%
-               filter( taxon == '1|root'), by = 'eggnog') %>%
-  #filter( cog_category != '-' ) %>%
-  #filter(!grepl("^2", eggnog)) %>%
-  group_by(eggnog) %>%
-  mutate(rank = row_number()) %>%
-  ungroup() %>%
-  filter( rank == 1) %>%
-  inner_join(eggnogs.edger[,c(1,2)], by = 'eggnog' ) %>%
-  inner_join(counts %>% filter( sample == 'KA1' | sample == 'KA2' |
-                                  sample == 'KB1' | sample == 'KB2'), by = 'orf') %>%
-  mutate(sample = if_else(grepl("KA1", sample), 'KA', sample)) %>%
-  mutate(sample = if_else(grepl("KA2", sample), 'KA', sample)) %>%
-  mutate(sample = if_else(grepl("KB1", sample), 'KB', sample)) %>%
-  mutate(sample = if_else(grepl("KB2", sample), 'KB', sample)) %>%
-  group_by(sample, eggnog, logFC) %>%
-  summarise(m_tpm = mean(tpm), .groups = 'drop') %>%
-  ggplot(aes(x=eggnog)) +
-  scale_fill_manual(values = setcol) +
-  geom_col(aes(y=log(m_tpm), fill = sample),
-           position = 'dodge',
-           colour = 'Black') +
-        geom_point(aes(y=logFC)) +
-        theme_minimal() +
-  scale_y_continuous(
-    name = "log(TPM)",
-    sec.axis = sec_axis(~ ., name = "logFC")
-  ) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6))
+# p6 <- edger %>%
+#   filter(PValue < 0.01) %>%
+#   filter(logFC > 1.5) %>%
+#   filter(contrast == 'KA-KB') %>%
+#   inner_join((eggnogs.edger %>%
+#                select(-orf) %>%
+#                distinct()) %>%
+#                filter( taxon == '1|root'), by = 'eggnog') %>%
+#   #filter( cog_category != '-' ) %>%
+#   #filter(!grepl("^2", eggnog)) %>%
+#   group_by(eggnog) %>%
+#   mutate(rank = row_number()) %>%
+#   ungroup() %>%
+#   filter( rank == 1) %>%
+#   inner_join(eggnogs.edger[,c(1,2)], by = 'eggnog' ) %>%
+#   inner_join(counts %>% filter( sample == 'KA1' | sample == 'KA2' |
+#                                   sample == 'KB1' | sample == 'KB2'), by = 'orf') %>%
+#   mutate(sample = if_else(grepl("KA1", sample), 'KA', sample)) %>%
+#   mutate(sample = if_else(grepl("KA2", sample), 'KA', sample)) %>%
+#   mutate(sample = if_else(grepl("KB1", sample), 'KB', sample)) %>%
+#   mutate(sample = if_else(grepl("KB2", sample), 'KB', sample)) %>%
+#   group_by(sample, eggnog, logFC) %>%
+#   summarise(m_tpm = mean(tpm), .groups = 'drop') %>%
+#   ggplot(aes(x=eggnog)) +
+#   scale_fill_manual(values = setcol) +
+#   geom_col(aes(y=log(m_tpm), fill = sample),
+#            position = 'dodge',
+#            colour = 'Black') +
+#         geom_point(aes(y=logFC)) +
+#         theme_minimal() +
+#   scale_y_continuous(
+#     name = "log(TPM)",
+#     sec.axis = sec_axis(~ ., name = "logFC")
+#   ) +
+#   theme(axis.text.x = element_text(angle = 90, hjust = 1, size = 6))
 ```
 
 # Discussion

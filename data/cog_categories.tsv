@@ -1,0 +1,25 @@
+cog_category	category_name
+A	RNA process
+B	Chromatin Struc
+C	Energy prod
+D	Cell cycle
+E	AA metab
+F	Nucl metab
+G	Carbohy metab
+H	Coenz metab
+I	Lipid metab
+J	Tranlsation
+K	Transcription
+L	Replication
+M	Cell wall
+N	Cell motility
+O	Post-transl mod
+P	Inorg ion transp
+Q	Sec Structure
+T	Signal Transduc
+U	Intracel traf
+Y	Nucl structure
+Z	Cytoskeleton
+R	Gen Func
+S	Func unknown
+-	Func unknown
