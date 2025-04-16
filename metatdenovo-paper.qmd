@@ -779,6 +779,7 @@ p0 / p1 +
 
 ```{r fig-ms1-comparison}
 #| label: fig-mst1-comparison
+#| fig-cap: '**Taxonomic and functional comparison between Bunse et al. 2017 annotation and nf-core/metatdenovo.**'
 #| fig-height: 8
 #| fig-width: 10
 
@@ -794,6 +795,7 @@ TAXON_COLOURS <- c(
   'Rhodobacteraceae'          = '#CCD1A3'
 )
 
+# Taxonomy
 p0 <- eukulele %>%
   filter(family %in% names(TAXON_COLOURS)) %>%
   union(
@@ -824,6 +826,7 @@ p0 <- eukulele %>%
   facet_wrap(~method) +
   xlab('') + ylab('Rel. abundance')
 
+# Functional categories
 eggnogs %>%
   filter(run == 'megahit.prokka.without_bbnorm') %>%
   distinct(run, orf, cog_category) %>%
@@ -834,7 +837,6 @@ eggnogs %>%
   group_by(sample, cog_category) %>%
   summarise(tpm = sum(tpm), .groups = 'drop') %>%
   inner_join(cog_categories, by = join_by(cog_category)) -> t
-
 p1 <- t %>%
   inner_join(samples, by = join_by(sample)) %>%
   group_by(category_name, sample_group) %>%
@@ -858,15 +860,53 @@ p1 <- t %>%
   ggplot(aes(x = category_name, y = value, fill = sample_group)) +
   geom_col(position = 'dodge') +
   scale_fill_discrete('Sample group') +
-  facet_wrap(~method, scales = 'free') +
+  facet_grid(~method, scales = 'free_x', space = 'free_x') +
   xlab('') + ylab('Rel. abundance') +
   theme(
     axis.text.x = element_text(angle = 65, hjust = 1)
   )
 
-p0 / p1 +
+# Significant genes
+eggnogs %>%
+  filter(run == 'megahit.prokka.without_bbnorm', preferred_name != '-') %>%
+  transmute(orf, eggnog_ogs, gene = preferred_name, description) %>%
+  mutate(eggnog = str_remove(eggnog_ogs, '@.*')) %>%
+  inner_join(
+    read_tsv('data/bunse2016_diff_genes.tsv', col_types = 'c'),
+    by = join_by(gene)
+  ) %>%
+  distinct(orf, gene, eggnog, description) -> g
+p2 <- g %>%
+  distinct(orf, gene) %>%
+  inner_join(
+    counts %>% 
+      inner_join(samples, by = join_by(sample)) %>%
+      filter(
+        run == 'megahit.prokka.without_bbnorm',
+        sample_group %in% c('Lca', 'Lcc')
+      ),
+    by = join_by(orf)
+  ) %>%
+  group_by(gene, sample_group, sample) %>%
+  summarise(tpm = sum(tpm), .groups = 'drop_last') %>%
+  summarise(tpm = mean(tpm), .groups = 'drop') %>%
+  pivot_wider(names_from = sample_group, values_from = tpm) %>%
+  mutate(log2r = log2(Lca/Lcc)) %>%
+  inner_join(
+    g %>%
+      distinct(gene, description) %>%
+      group_by(gene) %>% summarise(descs = str_c(description, collapse = ',')),
+    by = join_by(gene)
+  ) %>%
+  ggplot(aes(x = gene, y = log2r, colour = (abs(log2r) > 1))) +
+  geom_point() +
+  labs(x = '', y = 'log2 ratio', colour = 'At least two-fold')
+
+p0 / p1 / p2 +
+  plot_layout(heights = c(3,3,1)) +
   plot_annotation(tag_levels = 'A')
 ```
+
 ```{r mst spades prodigal - functional annotation table - selected genes, echo = FALSE, warning = FALSE}
 # # # check the same genes that are DE in MST paper
 # # # nqrB atpC ccoN nqrE pet (there are severals type), ccmC, sdhd, coxN, mxaF, rhodopsin (change in prd), psaC, psbC, actP, secD, secE, multidrug transport system (change in mtsp), dicarboxylate transport system (change in ttdt), PFAM Sodium sulphate symporter (change in str), dctM (in pfam), nucleoside transporter (change in nucT), pyrophosphate-specific outer membrane porin (change in oprO)
