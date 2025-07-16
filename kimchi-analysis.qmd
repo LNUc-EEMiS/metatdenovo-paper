@@ -49,18 +49,27 @@ library(patchwork)
 ```{r constants}
 #| label: constants
 TAXON_RANKS_SORTED = c('root', 'domain', 'phylum', 'class', 'order', 'family', 'genus', 'species')
-mst1.samples.color <- c("#ea3a25", "#f09536", "#1a43f5", "#74fafd")
-matchingcolors.original.tax <- c("#00b1f1", "#ffff00", "#4e6227",
-                                 "#e66c09", "#fe0000","#001f5f")
-# kimchi
+
 k.rank.taxa <- c("Leuconostoc_carnosum", "Leuconostoc_gelidum",
                        "Leuconostoc_inhae", "Weissella_koreensis",
                        "Latilactobacillus_sakei", "Leuconostoc_mesenteroides")
 k.rank.p1 <- c("Leuconostoc_carnosum", "Leuconostoc_gelidum",
                        "Leuconostoc_inhae", "Weissella_koreensis",
                        "Latilactobacillus_sakei", "Leuconostoc_mesenteroides", "Others")
-k.color.taxon <- c( "#01b4f6", "#fefd03", "#4e6227", "#e76d0c", "#fc0102", "#01205d",
-                  "tan1",'darkgray', 'wheat4', '#DDAD4B', 'chartreuse')
+k.color.taxon <- c(
+  "#999999",   # grey
+  "#E69F00",   # orange
+  "#56B4E9",   # sky blue
+  "#009E73",   # teal green
+  "#F0E442",   # soft yellow
+  "#0072B2",   # dark blue
+  "#D55E00",   # reddish brown
+  "#CC79A7",   # purple-pink
+  "#332288",   # navy
+  "#88CCEE",   # light blue
+  "#44AA99"    # green-cyan
+)
+
 k.rank.order <- c("Bacteria", "Gammaproteobacteria",
                        "Lachnospirales", "Plants",
                        "Oscillospirales", "Lactobacillales", 'others', 'UBA9160', "Viruses", "Xanthomonadales")
@@ -274,6 +283,7 @@ k.prokkas <- read_tsv('nextflow/kimchi/megahit.prokka.without_bbnorm/summary_tab
                       show_col_types = FALSE, guess_max = 1e6)
 
 ```
+
 ```{r tax-annots-og}
 #| label: tax-annots-og
 #| cache-lazy: false
@@ -526,7 +536,7 @@ p0
 -   the proportion of mapped reads on at species level is different, higher in Kimchi. probably for less specificity (C-D)
 
 ```{r unused code for mapped proportion }
-# # metatdenovo output proportion mapped reads (FC vs gtdb)
+# metatdenovo output proportion mapped reads (FC vs gtdb)
 j7 <- k.counts.tax %>%
   filter(sample == 'J7') %>%
   mutate(percentage = (count*100/13904698))
@@ -589,35 +599,6 @@ p1  <- selected.other.nc.rds %>%
   geom_col(width= .5, colour="black", size = 0.5) +
   facet_wrap(~data) +
   labs(x = "", fill = "taxon", y = "Mapped reads (%)")
-# 
-# top.15.order <- k.counts.tax.phylodb.gtdb %>%
-#   group_by(order, sample) %>%
-#   summarise(sum_tpm = sum(tpm),  .groups = 'drop_last') %>%
-#   summarise(mean_tpm = mean(sum_tpm), .groups = 'drop') %>%
-#   slice_max(mean_tpm, n = 15) %>%
-#   filter( order != 'uncl.' )
-# 
-# p2 <- k.counts.tax.phylodb.gtdb %>%
-#   inner_join( top.15.order, by = 'order') %>%
-#   group_by(sample, order) %>%
-#   mutate( order = replace(order, domain == 'Viruses', 'Viruses'),
-#           order = replace(order, phylum == ' Archaeplastida', 'Plants'),
-#           order = replace(order, order == 'Bacteria uncl. uncl. uncl.', 'Bacteria'),
-#           order = replace(order, order == 'Gammaproteobacteria uncl.', 'Gammaproteobacteria')) %>% 
-#   summarise(sum_tpm = sum(tpm), .groups = 'drop') %>%
-#   ggplot(aes(x = factor(sample, levels = k.rank.sample), y = sum_tpm, fill = factor(order, levels = k.rank.order))) +
-#   scale_fill_manual(values = k.color.taxon) +
-#   theme(legend.text = element_text(size = 7),
-#     legend.title = element_blank(),
-#     legend.key.size = unit(0.1, "cm"),
-#     legend.position = c(0.4, 1.2),  # Move the legend slightly to the left
-#     axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
-#     axis.title.y = element_text(size = 10)) +
-#   guides(fill = guide_legend(nrow = 3))  +
-#   geom_col(width= .5, colour="black", size = 0.3) +
-#   labs(x = "", y = "TPM", fill = 'Major taxa')
-# 
-
 p1
 ```
 
@@ -628,7 +609,7 @@ p1
 #| fig-height: 10
 
 
-# ---- 1. Define reusable variables/functions ----
+# Define reusable variables/functions
 target_species <- c(
   "Leuconostoc_mesenteroides", "Leuconostoc_carnosum",
   "Leuconostoc_gelidum", "Weissella_koreensis",
@@ -644,7 +625,7 @@ sample_totals <- tribble(
   "J29",    6025743
 )
 
-# ---- 2. Calculate percentages and categorize taxa ----
+# Calculate percentages and categorize taxa
 taxa_percentages <- k.counts.tax %>%
   mutate(project = ifelse(project == "kimchi", "Jung et al.", project)) %>%
   left_join(sample_totals, by = "sample") %>%
@@ -674,7 +655,7 @@ plot_data <- taxa_percentages %>%
   mutate(data = "metatdenovo") %>%
   bind_rows(taxonomy.op[, -3])  # Combine with external data
 
-# ---- 3. Plot: Mapped reads (%) ----
+# Mapped reads (%)
 p1 <- plot_data %>%
   mutate(data = ifelse(data == "kimchi", "Jung et al.", data)) %>%
   ggplot(aes(
@@ -698,7 +679,7 @@ p1 <- plot_data %>%
   ) +
   guides(fill = guide_legend(nrow = 3))
 
-# ---- 4. Plot: Top orders (TPM) ----
+# Top orders (TPM)
 p2_data <- k.counts.tax.phylodb.gtdb %>%
   mutate(
     project = ifelse(project == "kimchi", "Jung et al.", project),
@@ -752,7 +733,7 @@ p2
 #| fig-cap: '**Heatmap**'
 #| fig-height: 10
 
-# code for enzymes
+# Code for enzymes
 # 1, Glucokinase; 2, Glucose-6-phosphate isomerase; 3, 6-Phosphofructokinase; 
 # 4, Fructose-bisphosphate aldolase; 5, Triose-phosphate isomerase; 
 # 6, Glyceraldehyde-3-phosphate dehydrogenase; 7, Phosphoglycerate kinase; 
@@ -844,14 +825,14 @@ p3 <- filtered_genes %>%
   mutate(ColorCategory = cut(sum_tpm, breaks = color_thresholds, labels = color_labels, include.lowest = TRUE)) %>%
   ggplot(aes(x = factor(sample, level = k.rank.sample), y = factor(product, level = k.rank.genes),
              fill = ColorCategory)) +
-  geom_tile(colour="black", size = 1) +
+  geom_tile(colour="black", size = 0.1) +
   scale_fill_manual(
-    values = c(
-      "0" = "blue",
-      "100" = "lightblue",
-      "1000" = "green",
-      "10000" = "yellow",
-      ">15000" = "red"
+     values = c(
+    "0" = "#999999",     # grey - neutral low value
+    "100" = "#E69F00",   # orange - distinguishable and soft
+    "1000" = "#56B4E9",  # sky blue - high contrast
+    "10000" = "#009E73", # teal green - calm and clear
+    ">15000" = "#D55E00" # reddish-brown - attention without being flashy
     ),
     breaks = color_labels,
     labels = color_labels,
