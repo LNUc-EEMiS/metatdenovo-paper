@@ -1,0 +1,881 @@
+---
+title: "nf-core/metatdenovo - kimchi dataset analysis"
+author: "danilo.dileo@lnu.se, emelie.nilsson@lnu.se, ..., daniel.lundin@lnu.se"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+format:
+  html:
+    code-fold: true
+    toc: true
+  pdf:
+    toc: true
+    number-sections: true
+    colorlinks: true
+bibliography:
+  - bibliography.bib
+  - grateful-refs.bib
+---
+
+```{r setup}
+#| label: setup
+#| echo: false
+#| cache: false
+
+knitr::opts_chunk$set(echo = TRUE, fig.path='figures/', cache = TRUE, fig.width = 10)
+ggplot2::theme_set(ggplot2::theme_bw())
+```
+
+```{r libraries}
+#| label: libraries
+#| message: false
+#| cache: false
+#| include: false
+
+library(readr)
+library(forcats)
+library(tibble)
+library(dplyr, warn.conflicts = FALSE)
+library(tidyr)
+library(lubridate)
+library(purrr)
+library(stringr)
+library(ggplot2)
+library(kfigr)
+library(knitr)
+library(DT)
+library(grateful)
+library(patchwork)
+```
+
+```{r constants}
+#| label: constants
+TAXON_RANKS_SORTED = c('root', 'domain', 'phylum', 'class', 'order', 'family', 'genus', 'species')
+mst1.samples.color <- c("#ea3a25", "#f09536", "#1a43f5", "#74fafd")
+matchingcolors.original.tax <- c("#00b1f1", "#ffff00", "#4e6227",
+                                 "#e66c09", "#fe0000","#001f5f")
+# kimchi
+k.rank.taxa <- c("Leuconostoc_carnosum", "Leuconostoc_gelidum",
+                       "Leuconostoc_inhae", "Weissella_koreensis",
+                       "Latilactobacillus_sakei", "Leuconostoc_mesenteroides")
+k.rank.p1 <- c("Leuconostoc_carnosum", "Leuconostoc_gelidum",
+                       "Leuconostoc_inhae", "Weissella_koreensis",
+                       "Latilactobacillus_sakei", "Leuconostoc_mesenteroides", "Others")
+k.color.taxon <- c( "#01b4f6", "#fefd03", "#4e6227", "#e76d0c", "#fc0102", "#01205d",
+                  "tan1",'darkgray', 'wheat4', '#DDAD4B', 'chartreuse')
+k.rank.order <- c("Bacteria", "Gammaproteobacteria",
+                       "Lachnospirales", "Plants",
+                       "Oscillospirales", "Lactobacillales", 'others', 'UBA9160', "Viruses", "Xanthomonadales")
+k.rank.sample = c("J7", "J13", "J18", "J25", "J29")
+k.rank.genes = c("scrK", "uxuB", "actk", "xpkA", "gntZ",
+                "G6p1dh", "lctd", "pyk", "eno", "pgm",
+                "pgk", "gap", "tpiS","fba", "pfkA", "pgi","glK")
+```
+
+```{r read-execution-traces}
+#| label: read-data
+#| cache-lazy: false
+#| warning: false
+
+extraces <- Sys.glob('nextflow/kimchi/*/pipeline_info/execution_trace*') %>%
+  read_tsv(show_col_types = FALSE, id = 'fname') %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*'),
+    p       = str_remove(name, '.*:'),
+    process = str_remove(p, ' .*'),
+    sample  = str_replace(p, '.*\\((.*)\\)', '\\1'),
+    durationc  = str_remove(duration, ' *\\d+ms') %>%
+      ifelse(str_detect(., '\\dh'), ., str_c('0h', ., sep = ' ')) %>%
+      ifelse(str_detect(., '\\dm'), ., str_c('0m', ., sep = ' ')) %>%
+      ifelse(str_detect(., '\\ds'), ., str_c(., '0s', sep = ' ')) %>%
+      hms(),
+    realtimec  = str_remove(realtime, ' *\\d+ms') %>%
+      ifelse(str_detect(., '\\dh'), ., str_c('0h', ., sep = ' ')) %>%
+      ifelse(str_detect(., '\\dm'), ., str_c('0m', ., sep = ' ')) %>%
+      ifelse(str_detect(., '\\ds'), ., str_c(., '0s', sep = ' ')) %>%
+      hms(),
+    num_cpus   = ( str_remove(`%cpu`, '%') %>%
+      as.double()/100 ) %>%
+      ceiling(),
+    peak_rssc = case_when(
+      str_detect(peak_rss, 'GB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^3,
+      str_detect(peak_rss, 'MB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^2,
+      str_detect(peak_rss, 'KB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^1,
+      str_detect(peak_rss, 'B')  ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^0,
+      TRUE                       ~ 0
+    ),
+    peak_vmemc = case_when(
+      str_detect(peak_vmem, 'GB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^3,
+      str_detect(peak_vmem, 'MB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^2,
+      str_detect(peak_vmem, 'KB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^1,
+      str_detect(peak_vmem, 'B')  ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^0,
+      TRUE                       ~ 0
+    ),
+    rcharc = case_when(
+      str_detect(rchar, 'GB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^3,
+      str_detect(rchar, 'MB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^2,
+      str_detect(rchar, 'KB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^1,
+      str_detect(rchar, 'B')  ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^0,
+      TRUE                       ~ 0
+    ),
+    wcharc = case_when(
+      str_detect(wchar, 'GB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^3,
+      str_detect(wchar, 'MB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^2,
+      str_detect(wchar, 'KB') ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^1,
+      str_detect(wchar, 'B')  ~ str_remove(peak_rss, ' .*') %>% as.numeric() * 1024^0,
+      TRUE                       ~ 0
+    )
+  ) %>%
+  select(-p, -fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, process, sample)
+```
+
+```{r read-overall-stats}
+#| label: read-overall-stats
+#| warning: false
+#| cache-lazy: false
+
+k.overall_stats <- Sys.glob('nextflow/kimchi/*/summary_tables/*overall_stats.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen) %>%
+  mutate( sample = str_replace(sample, "SRR443366", "J7"),
+          sample = str_replace(sample, "SRR443367", "J13"),
+          sample = str_replace(sample, "SRR443368", "J18"),
+          sample = str_replace(sample, "SRR443369", "J25"),
+          sample = str_replace(sample, "SRR443370", "J29"))
+
+# pubmed search for intro plot
+pm <-  read_delim('tables/pubmed_metat.csv', delim = ';', show_col_types = FALSE)
+```
+
+```{r read-transrate}
+#| label: read-transrate
+#| warning: false
+#| cache-lazy: false
+
+transrates <- Sys.glob('nextflow/kimchi/*/transrate/*.csv') %>%
+  read_csv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  select(-fname, -run, -orf_caller) %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  relocate(project, assembly, assembler, bbnorm, minlen) %>%
+  distinct()
+```
+
+```{r read-counts}
+#| label: read-counts
+#| cache-lazy: false
+#| warning: false
+
+counts <- Sys.glob('nextflow/kimchi/*/summary_tables/*.counts.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, sample)
+```
+
+```{r read-eukulele}
+#| message: false
+#| include: false
+#| label: read-eukulele
+#| cache-lazy: false
+#| warning: false
+# it looks like Eukulele failed to annotate the genes. could it be an error of the new version?
+eukulele <- Sys.glob('nextflow/kimchi/*/summary_tables/*_taxonomy.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    db      = str_replace(fname, 'nextflow\\/.*\\.(.*)_taxonomy.tsv.gz', '\\1'),
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, db) %>%
+  mutate(
+    taxon_rank = case_when(
+      str_detect(domain,  'uncl\\.')  ~ 'root',
+      str_detect(phylum,  'uncl\\.')  ~ 'domain',
+      str_detect(class,   'uncl\\.')  ~ 'phylum',
+      str_detect(order,   'uncl\\.')  ~ 'class',
+      str_detect(family,  'uncl\\.')  ~ 'order',
+      str_detect(genus,   'uncl\\.')  ~ 'family',
+      str_detect(species, 'uncl\\.')  ~ 'genus',
+      TRUE                            ~ 'species'
+    ) %>% factor(levels = TAXON_RANKS_SORTED, ordered = TRUE)
+  )
+
+k.taxonomy.euk <- read.table("nextflow/kimchi/megahit.prokka.without_bbnorm/summary_tables/kimchi-phylodb.out", sep = "\t", header = TRUE, fill = TRUE) %>%
+  select(-1) %>%
+  rename(orf = transcript_name) %>%
+  group_by(orf) %>%
+  filter(max_pid == max(max_pid)) %>%
+  ungroup() %>%
+  separate(
+    full_classification,
+    c("domain", "phylum", "class", "order", "family", "genus", "species"),
+    sep = ";"
+  ) %>%
+  mutate(
+    domain  = ifelse(is.na(domain)  | domain  == '', 'Uncl.', domain),
+    phylum   = ifelse(is.na(phylum)   | phylum   == '', sprintf("%s uncl.", domain), phylum),
+    class   = ifelse(is.na(class)   | class   == '', sprintf("%s uncl.", phylum), class),
+    order   = ifelse(is.na(order)   | order   == '', sprintf("%s uncl.", class),  order),
+    family  = ifelse(is.na(family)  | family  == '', sprintf("%s uncl.", order),  family),
+    genus   = ifelse(is.na(genus)   | genus   == '', sprintf("%s uncl.", family), genus),
+    species = ifelse(is.na(species) | species == '', sprintf("%s uncl.", genus),  species)
+  ) 
+```
+
+```{r read-eggnogs}
+#| label: read-eggnogs
+#| cache-lazy: false
+
+k.eggnogs <- Sys.glob('nextflow/kimchi/*/summary_tables/*.emapper.tsv.gz') %>%
+  read_tsv(id = 'fname', show_col_types = FALSE) %>%
+  mutate(
+    project = str_replace(fname, 'nextflow\\/([^/]+)\\/.*', '\\1'),
+    run     = str_remove(fname, 'nextflow\\/[^/]+\\/') %>% str_remove('\\/.*')
+  ) %>%
+  select(-fname) %>%
+  separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
+  mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
+  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  rename_with(str_to_lower) %>%
+  relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
+```
+
+```{r read-prokkas}
+#| label: read-prokkas
+#| cache-lazy: false
+k.prokkas <- read_tsv('nextflow/kimchi/megahit.prokka.without_bbnorm/summary_tables/megahit.prokka.prokka-annotations_kimchi.tsv.gz',
+                      show_col_types = FALSE, guess_max = 1e6)
+
+```
+```{r tax-annots-og}
+#| label: tax-annots-og
+#| cache-lazy: false
+
+original.tax <- tibble(
+  sample = c(rep("Lca",7), rep("Lcc",7), rep("Hca",7), rep("Hcc",7)),
+  family = c(rep(c("Other flavo.", "Flavobacteriaceae", "Other gammapr.", "Alteromonadaceae", "Other alphapr.", "SAR11 clade", "Rhodobacteraceae"),4)),
+  #family = c(rep(c("Schleiferiaceae", "Flavobacteriaceae", "Other gammapr.", "Alteromonadaceae", "Thalassospiraceae", "Pelagibacteraceae", "Rhodobacteraceae"),4)),
+  tpm = c(0.1, 0.5, 2.3, 2.4, 0.3, 0.4, 0.1,
+          0.1, 0.5, 2.3, 2.3, 0.5, 0.2, 0.1,
+          0.3, 0.5, 2.5, 0.7, 0.4, 0.1, 0.1,
+          0.1, 0.7, 2.5, 1.7, 0.9, 0.2, 0.2)
+  )
+```
+
+```{r func-annots-og}
+#| label: func-annots-og
+#| cache-lazy: false
+
+original.fun <- tibble(
+  sample = c(rep("Lca",13), rep("Lcc",13), rep("Hca",13), rep("Hcc",13)),
+  SEED = c(rep(c("Protein metabolism", "Clustering-based subsystem", "RNA Metabolism", "Membrane Transport", "Carbohydrates", "Miscellaneous", "Amino Acids and Derivates", "Respiration", "Cofactors, vitamins, Pigments", "Iron acquisition and mtabolism", "Nucleosiles and Nucleotides", "Fatty Acids", "Photosynthesis"),4)),
+  tpm = c(2.9, 1.8, 0.9, 1.1, 0.8, 0.88, 0.70, 0.88, 0.5, 0.5, 0.3, 0.15, 0.35,
+          3.3, 2, 1, 1, 0.82, 0.89, 0.72, 0.72, 0.52, 0.48, 0.33, 0.17, 0.3,
+          2.9, 2.4, 0.85, 0.85, 0.96, 0.78, 0.80, 0.70, 0.57, 0.45, 0.4, 0.25, 0.15,
+          3.1, 2.2, 0.88, 0.88, 0.97, 0.88, 0.78, 0.77, 0.56, 0.46, 0.35, 0.3, 0.2))
+```
+
+# Introduction
+
+Cite nf-core [@nf-core].
+
+
+# Materials and Methods
+
+## R and packages
+
+This analysis was run with `r R.version$version.string`. Versions of packages used can be found in Table @tbl-cite-packages.
+
+```{r tbl-cite-packages}
+#| label: tbl-cite-packages
+#| cache: false
+#| tbl-cap: Versions of R and packages used in this analysis.
+
+cite_packages(output = "table", pkgs = "Session", out.dir = getwd()) %>%
+  kable()
+```
+
+
+# Results
+
+## Pubmed report
+```{r plot-pubmed-metatranscriptomics}
+#| label: plot-pubmed-metatranscriptomics
+#| fig-height: 5
+#| fig-cap: '**Pubmed report for metatranscriptomic search (February 2024)**, number of paper that has metatranscriptomic word'
+
+p0 <- pm %>%
+  ggplot(aes(x = Year, y = Count)) +
+  geom_col(fill = "#0072B2", color = "black") +  # Blue with black border
+  labs(title = "Increase in Metatranscriptomics Publications Over Time",
+       x = "Year", 
+       y = "Number of Publications") +
+  theme_minimal(base_size = 14)
+
+
+pdf("figure1.pdf", width = 10, height = 10)  # apre il "dispositivo grafico PDF"
+p0
+dev.off()  # chiude e salva il file
+
+p0
+```
+
+## kimchi
+
+### Statistics plot - quality of mapping reads
+
+-   Nf-core/metatdenovo gets much higher mapped reads compared to kimchi (@tbl-kimchi-stats)
+-   Higher gap in J7 while progressively the gap decreases, probably because the isolate community incresases as well
+
+```{r tbl-kimchi-stats }
+#| label: tbl-kimchi-stats
+#| tbl-cap: '**Mapped reads comparison** Comparison of mapped reads between nf-core/metatdenovo and kimchi original paper. J7 has more gap than the rest of the samples, probably due the distribution of community among the samples'
+#| warning: false
+
+stats.og <- data.frame(sample = c("J7", "J13", "J18", "J25", "J29"),
+                       n_trimmed = c(30535784, 35269344, 33894898, 31437973, 32562239),
+                       n_non_contaminated = c(20198679, 16650892, 10820351, 4250132, 5793508),
+                       n_mapped = c(425552, 5332645, 8442826, 1768222, 3869480),
+                       database = c( "kimchi", "kimchi", "kimchi", "kimchi", "kimchi"))
+
+final_table <- k.overall_stats %>%
+  mutate( database = c( "metatdenovo", "metatdenovo", "metatdenovo", "metatdenovo", "metatdenovo")) %>%
+  rename( n_mapped = idxs_n_mapped) %>%
+  select(sample, n_trimmed, n_non_contaminated, n_mapped, database) %>%
+  rbind(stats.og) %>%
+  mutate( total.reads = c(58133534, 70957538, 66160090, 61382647, 63560382,
+                          58133534, 70957538, 66160090, 61382647, 63560382)) %>%
+  relocate( database, sample, total.reads, n_trimmed, n_non_contaminated, n_mapped)
+
+write.csv(final_table, "table_for_paper.csv", row.names = FALSE)
+
+final_table %>%
+  kable()
+```
+
+```{r table-kimchi-stats }
+#| label: plot-kimchi-stats
+#| tbl-cap: '**Mapped reads comparison** Comparison of mapped reads between nf-core/metatdenovo and kimchi original paper. J7 has more gap than the rest of the samples, probably due the distribution of community among the samples'
+
+k.ordered.plots <- c("p_mapped_to_NC", "p_gtdb_to_NC", "p_FC_to_NC", "p_gtdb_to_mapped", "p_FC_to_mapped", "p_gtdb_to_FC")
+
+k.overall_stats %>%
+  mutate( database = c( "metatdenovo", "metatdenovo", "metatdenovo", "metatdenovo", "metatdenovo")) %>%
+  rename( n_mapped = idxs_n_mapped) %>%
+  mutate( total.reads = c(58133534, 70957538, 66160090, 61382647, 63560382)) %>% 
+  group_by(sample) %>%
+  mutate( p_mapped_to_NC = (n_mapped*100)/n_non_contaminated,
+          p_FC_to_NC     = (n_feature_count*100)/n_non_contaminated,
+          p_FC_to_mapped = (n_feature_count*100)/n_mapped,
+          p_gtdb_to_NC   = (gtdb_eukulele_n_counts*100)/n_non_contaminated,
+          p_gtdb_to_mapped = (gtdb_eukulele_n_counts*100)/n_mapped,
+          p_gtdb_to_FC   = (gtdb_eukulele_n_counts*100)/n_feature_count
+          ) %>%
+    pivot_longer(p_mapped_to_NC:p_gtdb_to_FC, names_to = 'var', values_to = 'percentage') %>%
+  ggplot(aes(x = factor(sample, levels = k.rank.sample), y = percentage)) +
+  ylim(0,100) +
+  scale_fill_manual(values = k.color.taxon) +
+  facet_wrap(~factor(var, levels = k.ordered.plots), ncol = 2, drop = FALSE) +
+  geom_col(width= .5, colour="black") +
+  labs(title = "", x = "", y = "Mapped reads (%)") +
+  coord_flip()
+```
+
+### Taxonomical annotation - comparison with original data
+
+-   similar taxonomy annotation obtained for the species present in the original paper
+-   our pipeline can show other groups of bacteria present in the samples
+-   gtdb is a good database for this type of analysis
+
+```{r taxonomoical annotation table - tpms, echo = FALSE, warning = FALSE}
+#| fig-height: 10
+#| warning: false
+# build a table from original paper
+taxonomy.op <- data.frame( sample = c(rep("J7",6), rep("J13",6), rep("J18",6),
+                                      rep("J25",6), rep("J29",6)),
+                           species = rep(c("Leuconostoc_carnosum", "Leuconostoc_gelidum",
+                                        "Leuconostoc_inhae", "Weissella_koreensis",
+                                        "Latilactobacillus_sakei", "Leuconostoc_mesenteroides"),5),
+                           sum_tpm = c(0.089, 0.06, 0.04, 0.04, 0.05, 0.72,
+                                          0.07, 0.14, 0.02, 0.20, 0.27, 0.30,
+                                          0.02, 0.15, 0.05, 0.44, 0.22, 0.12,
+                                          0.08, 0.04, 0.01, 0.64, 0.05, 0.18,
+                                          0.015, 0.02, 0.005, 0.36, 0.45, 0.15),
+                           sum_perc = c(0.18,0.12,0.08,0.08,0.1,1.44,
+                                            2.24,4.48,0.64,6.4,8.64,9.6,
+                                            1.56,11.7,3.9,34.32,17.16,9.36,
+                                            3.36,1.68,0.42,26.88,2.1,7.56,
+                                            1,1.34,0.33,24.12,30.15,10.05),
+                           data = rep("kimchi",30) )
+
+
+# combine the gtdb and phylodb taxonomy and keep only the best pid, if the pid is the same choose gtdb
+k.taxonomy <- rbind(eukulele %>%
+                filter( project == 'kimchi' ) %>%
+                mutate_all(as.character) %>%
+                mutate(
+                  dplyr::across(
+                  .cols = everything(), 
+                  .fns = ~ dplyr::if_else(stringr::str_detect(.x, "NA uncl."), "uncl.", .x))) %>%
+                select(-project, -run, -assembly, -assembler, -orf_caller, -bbnorm, -minlen, -taxon_rank) %>%
+                as_tibble(), k.taxonomy.euk %>%
+                  mutate( db = 'phylodb') %>%
+                  relocate(db, .before = orf) %>%
+                  select(-counts)) %>%
+        group_by(orf) %>%
+  filter( max_pid == max(max_pid))
+  
+k1 <- k.taxonomy %>%
+  group_by(orf, max_pid) %>%
+  filter(n() > 1 & all(db == 'gtdb_prior_to_2024019'))
+k2 <- k.taxonomy %>%
+  filter(!duplicated(orf))
+k.tax.final <- bind_rows(k1, k2) %>%
+  distinct(orf, .keep_all = TRUE)
+
+# filter counts and change samples name
+# create a variable with both taxonomy annotations
+k.counts.tax.phylodb.gtdb <- counts %>%
+  filter( project == 'kimchi') %>%
+  mutate( sample = str_replace(sample, "SRR443366", "J7"),
+          sample = str_replace(sample, "SRR443367", "J13"),
+          sample = str_replace(sample, "SRR443368", "J18"),
+          sample = str_replace(sample, "SRR443369", "J25"),
+          sample = str_replace(sample, "SRR443370", "J29")) %>%
+  left_join( (bind_rows(k1, k2) %>%
+                distinct(orf, .keep_all = TRUE)), by = 'orf') %>%
+  mutate( species = replace(species, species == 'Latilactobacillus_sakei_A', 'Latilactobacillus_sakei')) %>%
+  mutate( order = replace(order, order == ' Lactobacillales', 'Lactobacillales'))
+
+# create a variable with only gtdb taxonomy
+k.counts.tax <- counts %>%
+  filter( project == 'kimchi') %>%
+  mutate( sample = str_replace(sample, "SRR443366", "J7"),
+          sample = str_replace(sample, "SRR443367", "J13"),
+          sample = str_replace(sample, "SRR443368", "J18"),
+          sample = str_replace(sample, "SRR443369", "J25"),
+          sample = str_replace(sample, "SRR443370", "J29")) %>%
+  left_join( eukulele %>%
+                filter( project == 'kimchi' ) %>%
+                mutate_all(as.character) %>%
+                mutate(
+                  dplyr::across(
+                  .cols = everything(), 
+                  .fns = ~ dplyr::if_else(stringr::str_detect(.x, "NA uncl."), "uncl.", .x))) %>%
+                select(-project, -run, -assembly, -assembler, -orf_caller, -bbnorm, -minlen, -taxon_rank) %>%
+                as_tibble(), by = 'orf') %>%
+  mutate( species = replace(species, species == 'Latilactobacillus_sakei_A', 'Latilactobacillus_sakei'),
+          species = replace(species, species == 'Leuconostoc_mesenteroides_B', 'Latilactobacillus_sakei'))
+
+# substitute NAs with 'uncl.'
+k.counts.tax[is.na(k.counts.tax)] <- 'uncl.'
+
+# bar plot with species found in the original paper
+p0 <- k.counts.tax %>%
+  mutate(project = ifelse(project == "kimchi", "Jung et al.", project)) %>%
+  filter( species == "Leuconostoc_mesenteroides" |
+            species == "Leuconostoc_carnosum" |
+  species == "Leuconostoc_gelidum" | species == "Weissella_koreensis" |
+  species == "Latilactobacillus_sakei" | species == "Leuconostoc_inhae") %>%
+  group_by(sample, species) %>%
+  summarise(sum_tpm = sum(tpm), .groups = 'drop') %>%
+  mutate( data = "metatdenovo") %>%
+  rbind( taxonomy.op[,-4]) %>%
+  mutate(data = ifelse(data == "kimchi", "Jung et al.", data)) %>%
+  ggplot(aes(x = factor(sample, levels = k.rank.sample), y = sum_tpm,
+             fill = factor(species, level = k.rank.taxa))) +
+  scale_fill_manual(values = k.color.taxon) +
+  theme(legend.position = 'none') +
+  geom_col(width= .5, colour="black", position = 'fill') +
+  facet_wrap(~data) +
+  labs(x = "", fill = "Species", y = "RE (%)")
+
+p0
+```
+
+### Taxonomical annotation - proportion mapped reads
+
+-   At species level nf-core/metatdenovo is following the same pattern as kimchi (@fig-kimchi-tax-annot A-B)
+-   the proportion of mapped reads on at species level is different, higher in Kimchi. probably for less specificity (C-D)
+
+```{r unused code for mapped proportion }
+# # metatdenovo output proportion mapped reads (FC vs gtdb)
+j7 <- k.counts.tax %>%
+  filter(sample == 'J7') %>%
+  mutate(percentage = (count*100/13904698))
+
+j13 <- k.counts.tax %>%
+  filter(sample == 'J13') %>%
+  mutate(percentage = (count*100/14985451))
+
+j18 <- k.counts.tax %>%
+  filter(sample == 'J18') %>%
+  mutate(percentage = (count*100/10982168))
+
+j25 <- k.counts.tax %>%
+  filter(sample == 'J25') %>%
+  mutate(percentage = (count*100/4065160))
+
+j29 <- k.counts.tax %>%
+  filter(sample == 'J29') %>%
+  mutate(percentage = (count*100/6025743))
+
+selected.species.nc.rds <- rbind(j7,j13,j18,j25,j29) %>%
+  filter( species == "Leuconostoc_mesenteroides" | species == "Leuconostoc_carnosum" |
+            species == "Leuconostoc_gelidum" | species == "Weissella_koreensis" | species == "Latilactobacillus_sakei" | species == "Leuconostoc_inhae") %>%
+  group_by(sample, species) %>%
+  summarise(sum_perc = sum(percentage), .groups = 'drop') %>%
+  rename( taxon = 'species')
+
+selected.other.nc.rds <- rbind(j7,j13,j18,j25,j29) %>%
+  group_by(sample) %>%
+  filter( species != "Leuconostoc_mesenteroides" & species != "Leuconostoc_carnosum" &
+            species != "Leuconostoc_gelidum" & species != "Weissella_koreensis" & species != "Latilactobacillus_sakei" & species != "Leuconostoc_inhae") %>%
+  mutate( taxon = 'Others') %>%
+  group_by(sample, taxon) %>%
+  summarise(sum_perc = sum(percentage), .groups = 'drop')
+
+top.other.nc.rds <- selected.other.nc.rds %>%
+  group_by(taxon, sample) %>%
+  summarise(perc = sum(sum_perc),  .groups = 'drop_last') %>%
+  summarise(mean_perc = mean(perc), .groups = 'drop') %>%
+  slice_max(mean_perc, n = 5) %>%
+  na.omit()
+
+p1  <- selected.other.nc.rds %>%
+  inner_join(top.other.nc.rds, by = 'taxon') %>%
+  select(-mean_perc) %>%
+  rbind(selected.species.nc.rds) %>%
+  rename( species = 'taxon') %>%
+  mutate( data = 'metatdenovo') %>%
+  rbind(taxonomy.op[,-3]) %>%
+  ggplot(aes(x = factor(sample, levels = k.rank.sample), y = sum_perc, fill = factor(species, levels = k.rank.p1))) +
+  ylim(0,100) +
+  scale_fill_manual(values = k.color.taxon) +
+  theme(legend.text = element_text(size = 6),
+    legend.title = element_blank(),
+    legend.key.size = unit(0.1, "cm"),
+    legend.position = c(0.5, 0.87),  # Move the legend slightly to the left
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.title.y = element_text(size = 10)) +
+  guides(fill = guide_legend(nrow = 3))  +
+  geom_col(width= .5, colour="black", size = 0.5) +
+  facet_wrap(~data) +
+  labs(x = "", fill = "taxon", y = "Mapped reads (%)")
+# 
+# top.15.order <- k.counts.tax.phylodb.gtdb %>%
+#   group_by(order, sample) %>%
+#   summarise(sum_tpm = sum(tpm),  .groups = 'drop_last') %>%
+#   summarise(mean_tpm = mean(sum_tpm), .groups = 'drop') %>%
+#   slice_max(mean_tpm, n = 15) %>%
+#   filter( order != 'uncl.' )
+# 
+# p2 <- k.counts.tax.phylodb.gtdb %>%
+#   inner_join( top.15.order, by = 'order') %>%
+#   group_by(sample, order) %>%
+#   mutate( order = replace(order, domain == 'Viruses', 'Viruses'),
+#           order = replace(order, phylum == ' Archaeplastida', 'Plants'),
+#           order = replace(order, order == 'Bacteria uncl. uncl. uncl.', 'Bacteria'),
+#           order = replace(order, order == 'Gammaproteobacteria uncl.', 'Gammaproteobacteria')) %>% 
+#   summarise(sum_tpm = sum(tpm), .groups = 'drop') %>%
+#   ggplot(aes(x = factor(sample, levels = k.rank.sample), y = sum_tpm, fill = factor(order, levels = k.rank.order))) +
+#   scale_fill_manual(values = k.color.taxon) +
+#   theme(legend.text = element_text(size = 7),
+#     legend.title = element_blank(),
+#     legend.key.size = unit(0.1, "cm"),
+#     legend.position = c(0.4, 1.2),  # Move the legend slightly to the left
+#     axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+#     axis.title.y = element_text(size = 10)) +
+#   guides(fill = guide_legend(nrow = 3))  +
+#   geom_col(width= .5, colour="black", size = 0.3) +
+#   labs(x = "", y = "TPM", fill = 'Major taxa')
+# 
+
+p1
+```
+
+```{r fig-kimchi-mapped-proportion }
+#| label: fig-kimchi-mapped-proportion
+#| warning: false
+#| fig-cap: '**Mapped proportion**'
+#| fig-height: 10
+
+
+# ---- 1. Define reusable variables/functions ----
+target_species <- c(
+  "Leuconostoc_mesenteroides", "Leuconostoc_carnosum",
+  "Leuconostoc_gelidum", "Weissella_koreensis",
+  "Latilactobacillus_sakei", "Leuconostoc_inhae"
+)
+
+sample_totals <- tribble(
+  ~sample,  ~total_reads,
+  "J7",     13904698,
+  "J13",    14985451,
+  "J18",    10982168,
+  "J25",    4065160,
+  "J29",    6025743
+)
+
+# ---- 2. Calculate percentages and categorize taxa ----
+taxa_percentages <- k.counts.tax %>%
+  mutate(project = ifelse(project == "kimchi", "Jung et al.", project)) %>%
+  left_join(sample_totals, by = "sample") %>%
+  mutate(percentage = (count * 100) / total_reads) %>%
+  mutate(
+    taxon = case_when(
+      species %in% target_species ~ species,
+      TRUE ~ "Others"
+    )
+  )
+
+# Summarize percentages for target species and top "Others"
+plot_data <- taxa_percentages %>%
+  group_by(sample, taxon) %>%
+  summarise(sum_perc = sum(percentage), .groups = "drop") %>%
+  # Identify top 5 "Others" (if needed)
+  mutate(
+    taxon = if_else(
+      taxon == "Others" & sum_perc < min(
+        filter(., taxon %in% target_species) %>% pull(sum_perc)
+      ),
+      "Other low-abundance",
+      taxon
+    )
+  ) %>%
+  rename(species = taxon) %>%
+  mutate(data = "metatdenovo") %>%
+  bind_rows(taxonomy.op[, -3])  # Combine with external data
+
+# ---- 3. Plot: Mapped reads (%) ----
+p1 <- plot_data %>%
+  mutate(data = ifelse(data == "kimchi", "Jung et al.", data)) %>%
+  ggplot(aes(
+    x = factor(sample, levels = k.rank.sample),
+    y = sum_perc,
+    fill = factor(species, levels = k.rank.p1)
+  )) +
+  geom_col(width = 0.5, colour = "black", size = 0.5) +
+  scale_fill_manual(values = k.color.taxon) +
+  labs(x = "", y = "Mapped reads (%)", fill = "Taxon") +
+  ylim(0, 100) +
+  facet_wrap(~data) +
+  theme(
+    #legend.text = element_text(size = 6),
+    legend.title = element_blank(),
+    legend.key.size = unit(0.3, "cm"),
+    legend.text = element_text(size = 7),
+    legend.position = 'top',
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.title.y = element_text(size = 10)
+  ) +
+  guides(fill = guide_legend(nrow = 3))
+
+# ---- 4. Plot: Top orders (TPM) ----
+p2_data <- k.counts.tax.phylodb.gtdb %>%
+  mutate(
+    project = ifelse(project == "kimchi", "Jung et al.", project),
+    order = case_when(
+      domain == "Viruses" ~ "Viruses",
+      phylum == " Archaeplastida" ~ "Plants",
+      order == "Bacteria uncl. uncl. uncl." ~ "Bacteria",
+      order == "Gammaproteobacteria uncl." ~ "Gammaproteobacteria",
+      TRUE ~ order
+    )
+  ) %>%
+  group_by(order, sample) %>%
+  summarise(sum_tpm = sum(tpm), .groups = "drop")
+
+top_orders <- p2_data %>%
+  filter(order != "uncl.") %>%
+  group_by(order) %>%
+  summarise(mean_tpm = mean(sum_tpm), .groups = "drop") %>%
+  slice_max(mean_tpm, n = 15)
+
+p2 <- p2_data %>%
+  inner_join(top_orders, by = "order") %>%
+  ggplot(aes(
+    x = factor(sample, levels = k.rank.sample),
+    y = sum_tpm,
+    fill = factor(order, levels = k.rank.order)
+  )) +
+  geom_col(width = 0.5, colour = "black", size = 0.3) +
+  scale_fill_manual(values = k.color.taxon) +
+  labs(x = "", y = "TPM", fill = "Major taxa") +
+  theme(
+    legend.text = element_text(size = 7),
+    legend.title = element_blank(),
+    legend.key.size = unit(0.1, "cm"),
+    legend.position = c(0.4, 1.2),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.title.y = element_text(size = 10)
+  ) +
+  guides(fill = guide_legend(nrow = 3))
+p2
+```
+
+### Functional annotation - heatmap
+
+-   The heatmap shows how many genes related to fermentative processeses. (@fig-kimchi-heatmap)
+-   Some processes are specific for the Genus while others are present in all Genus
+
+```{r fig-kimchi-heatmap}
+#| label: fig-kimchi-heatmap
+#| warning: false
+#| fig-cap: '**Heatmap**'
+#| fig-height: 10
+
+# code for enzymes
+# 1, Glucokinase; 2, Glucose-6-phosphate isomerase; 3, 6-Phosphofructokinase; 
+# 4, Fructose-bisphosphate aldolase; 5, Triose-phosphate isomerase; 
+# 6, Glyceraldehyde-3-phosphate dehydrogenase; 7, Phosphoglycerate kinase; 
+# 8, Phosphoglycerate mutase; 9, Enolase; 10, Pyruvate kinase; 11, Lactate dehydrogenase;
+# 12, Glucose-6-phosphate 1-dehydrogensase; 13, 6-Phosphogluconate dehydrogenase;
+# 14, Ribulose-5-phosphate 3-epimerase; 15, Xylulose 5-phosphate phosphoketolase;
+# 16, Phosphotransacetylase; 17, Bifunctional acetaldehyde-CoA/Alcohol dehydrogenase; 
+# 18, Acetate kinase; 19, Mannitol dehydrogenase; 20, Fructokinase.
+
+filtered_genes <- k.counts.tax %>%
+  select( -minlen) %>%
+  left_join(k.prokkas, by = join_by(orf, start, end, strand)) %>%
+  left_join(k.eggnogs %>% filter(project == 'kimchi'), by = join_by(project, run, assembler, orf_caller, bbnorm, orf, assembly)) %>%
+  mutate( species = replace(species, species == 'Latilactobacillus_sakei_A', 'Latilactobacillus_sakei')) %>%
+  mutate(product = replace(product, pfams == 'Enolase_C,Enolase_N', 'Enolase')) %>%
+  mutate(product = replace(product, pfams == 'His_Phos_1', 'phosphoglycerate mutase')) %>%
+  mutate(product = replace(product, 
+                              pfams == 'Mannitol_dh,Mannitol_dh_C', 'Mannitol dehydrogenase')) %>%
+  mutate(product = replace(product, product == 'Enolase 2', 'Enolase')) %>%
+  mutate(product = replace(product, 
+                              product == 'L-lactate dehydrogenase', 'lactate dehydrogenase')) %>%
+  mutate(product = replace(product, 
+                              product == 'D-lactate dehydrogenase', 'lactate dehydrogenase')) %>%
+  mutate(product = replace(product, 
+                              product == 'Quinone-dependent D-lactate dehydrogenase',
+                              'lactate dehydrogenase')) %>%
+  mutate(product = replace(product, preferred_name == 'fba', 'Aldolase')) %>%
+  mutate(product = replace(product, 
+                              description == 'Triosephosphate isomerase', 'Triosephosphate isomerase')) %>%
+  mutate(product = replace(product, description == 'Belongs to the glyceraldehyde-3-phosphate dehydrogenase family', 'Glyceraldehyde-3-phosphate dehydrogenase')) %>%
+  mutate(product = replace(product, description == 'Belongs to the phosphoglycerate kinase family', 'Phosphoglycerate kinase')) %>%
+  mutate(product = replace(product, preferred_name == 'glcK', 'Glucokinase')) %>%
+  mutate(product = replace(product, description == 'L-lactate dehydrogenase (FMN-dependent) and related alpha-hydroxy acid dehydrogenases', 'lactate dehydrogenase')) %>%
+  mutate(product = replace(product, preferred_name == 'gnd', '6-Phosphogluconate dehydrogenase')) %>%
+  mutate(product = replace(product, pfams == '6PGD,NAD_binding_2', '6-Phosphogluconate dehydrogenase')) %>%
+  mutate(product = replace(product, description == 'Phosphoketolase', 'Phosphoketolase')) %>%
+  mutate(product = replace(product, description == 'D-xylulose 5-phosphate/D-fructose 6-phosphate phosphoketolase', 'Phosphoketolase')) %>%
+  mutate(product = replace(product, product == 'Putative fructokinase', 'Fructokinase')) %>%
+  mutate(product = replace(product, description == '6-phosphate phosphoketolase', 'Phosphoketolase')) %>%
+  mutate(product = replace(product, preferred_name == 'zwf', 'G6p1dh')) %>%
+  mutate(product = replace(product, product == "Glucokinase", "glK"),
+         product = replace(product, product == "Glucose-6-phosphate isomerase", "	
+pgi"),
+         product = replace(product, product == "ATP-dependent 6-phosphofructokinase", "pfkA"),
+         product = replace(product, product == "Aldolase", "fba"),
+         product = replace(product, product == "Triosephosphate isomerase", "tpiS"),
+         product = replace(product, product == "Glyceraldehyde-3-phosphate dehydrogenase", "gap"),
+         product = replace(product, product == "Phosphoglycerate kinase", "pgk"),
+         product = replace(product, product == "phosphoglycerate mutase", "pgm"),
+         product = replace(product, product == "Enolase", "eno"),
+         product = replace(product, product == "Pyruvate kinase", "pyk"),
+         product = replace(product, product == "lactate dehydrogenase", "lctd"),
+         product = replace(product, product == "G6p1dh", "G6p1dh"),
+         product = replace(product, product == "6-Phosphogluconate dehydrogenase", 	
+"gntZ"),
+         product = replace(product, product == "Phosphoketolase", "	
+xpkA"),
+         product = replace(product, product == "Mannitol dehydrogenase", "	
+uxuB"),
+         product = replace(product, product == "Fructokinase", "	
+scrK"),
+         product = replace(product, product == "Acetate kinase", "actk")
+         ) %>%
+  filter( product %in% 
+            c("glK", "pgi", "pfkA",
+              "fba", "tpiS", "gap",
+              "pgk", "pgm", "eno", "pyk",
+              "lctd", "G6p1dh", "gntZ",
+              "xpkA", "uxuB", "scrK", "actk")) %>%
+  filter( genus %in% c("Latilactobacillus", "Leuconostoc", "Weissella")) %>%
+  mutate(genus = fct_relevel(genus, "Leuconostoc", "Latilactobacillus",
+                             "Weissella"))
+
+# set colors and contants for heatmap
+k.custom_colors <- c("blue", "light blue", "green", "yellow", "red")
+breaks <- c(1, 10, 4000, 8000)
+color_thresholds <- c(0, 100, 1000, 10000, 15000, Inf)
+color_labels <- c("0", "100", "1000", "10000", ">15000")
+
+p3 <- filtered_genes %>%
+  select(-tpm) %>%
+  mutate( r = count/length) %>%
+  group_by(sample) %>% 
+  mutate(tpm = r/sum(r) * 1e6) %>% 
+  ungroup() %>%
+  select(-r) %>%
+  group_by(genus, sample, product) %>%
+  summarise(sum_tpm = sum(tpm), .groups = 'drop') %>%
+  mutate(ColorCategory = cut(sum_tpm, breaks = color_thresholds, labels = color_labels, include.lowest = TRUE)) %>%
+  ggplot(aes(x = factor(sample, level = k.rank.sample), y = factor(product, level = k.rank.genes),
+             fill = ColorCategory)) +
+  geom_tile(colour="black", size = 1) +
+  scale_fill_manual(
+    values = c(
+      "0" = "blue",
+      "100" = "lightblue",
+      "1000" = "green",
+      "10000" = "yellow",
+      ">15000" = "red"
+    ),
+    breaks = color_labels,
+    labels = color_labels,
+    guide = "legend"
+  ) +
+  facet_wrap(~ genus) +
+  labs(x = "", y = "") +
+  theme(
+    axis.text.x = element_text(angle = -90, size = 8, hjust = 1),
+    panel.grid = element_blank(),
+    legend.position = 'right',
+    legend.title = element_blank(),
+    #legend.key.size = unit(0.1, "cm")
+    ) +
+  coord_fixed(ratio = 0.9)
+ 
+px <- (p1 + p0) /p3 + plot_annotation(tag_levels = 'A')
+
+
+pdf("figure.pdf", width = 10, height = 10)  # apre il "dispositivo grafico PDF"
+px
+dev.off()  # chiude e salva il file
+
+px
+```
+
+
