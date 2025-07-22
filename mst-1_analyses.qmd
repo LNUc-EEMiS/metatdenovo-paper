@@ -1,6 +1,6 @@
 ---
 title: "nf-core/metatdenovo"
-author: "danilo.dileo@lnu.se, emelie.nilsson@lnu.se, ..., daniel.lundin@lnu.se"
+author: "danilo.dileo@lnu.se, emelie.nilsson@lnu.se, Arianna Krinos, Jarone Pinhassi, daniel.lundin@lnu.se"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 format:
   html:
@@ -56,8 +56,8 @@ mst1.samples.color <- c("#ea3a25", "#f09536", "#1a43f5", "#74fafd")
 ```{r func-post-process-table}
 #| label: func-post-process-table
 post_process_table <- function(paths) {
-  #t <- Sys.glob('nextflow/*/*/summary_tables/*.gtdb-r220.diamond.taxonomy.tsv.gz') %>%
-  #t <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
+  #t <- Sys.glob('nextflow/mst-1/*/summary_tables/*.gtdb-r220.diamond.taxonomy.tsv.gz') %>%
+  #t <- Sys.glob('nextflow/mst-1/*/summary_tables/*.counts.tsv.gz') %>%
   paths %>%
     read_tsv(id = 'fname', show_col_types = FALSE) %>%
     mutate(
@@ -94,7 +94,7 @@ samples <- read_tsv('data/samples.tsv', col_types = 'ccic')
 #| label: read-data
 #| cache-lazy: false
 
-extraces <- Sys.glob('nextflow/*/*/pipeline_info/execution_trace*') %>%
+extraces <- Sys.glob('nextflow/mst-1/*/pipeline_info/execution_trace*') %>%
   str_subset('top3', negate = TRUE) %>%
   read_tsv(col_types = 'icicccTccccccc', id = 'fname') %>%
   mutate(
@@ -164,7 +164,7 @@ process_groups <- read_tsv('data/process_groups.tsv', show_col_types = FALSE) %>
 #| warning: false
 #| cache-lazy: false
 
-overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %>%
+overall_stats <- Sys.glob('nextflow/mst-1/*/summary_tables/*overall_stats.tsv.gz') %>%
   str_subset('top3', negate = TRUE) %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
@@ -183,7 +183,7 @@ overall_stats <- Sys.glob('nextflow/*/*/summary_tables/*overall_stats.tsv.gz') %
 #| warning: false
 #| cache-lazy: false
 
-transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
+transrates <- Sys.glob('nextflow/mst-1/*/transrate/*.csv') %>%
   str_subset('top3', negate = TRUE) %>%
   str_subset('prodigal') %>%
   read_csv(id = 'fname', show_col_types = FALSE) %>%
@@ -203,7 +203,7 @@ transrates <- Sys.glob('nextflow/*/*/transrate/*.csv') %>%
 #| label: read-idxstats
 #| cache-lazy: false
 
-idxstats <- Sys.glob('nextflow/*/*/samtools/*.idxstats') %>%
+idxstats <- Sys.glob('nextflow/mst-1/*/samtools/*.idxstats') %>%
   str_subset('top3', negate = TRUE) %>%
   #post_process_table()
   read_tsv(id = 'fname', show_col_types = FALSE, col_names = c('contig', 'length', 'n_mapped', 'n_unmapped')) %>%
@@ -229,8 +229,9 @@ idxstats <- Sys.glob('nextflow/*/*/samtools/*.idxstats') %>%
 ```{r read-counts}
 #| label: read-counts
 #| cache-lazy: false
+#| warning: false
 
-counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
+counts <- Sys.glob('nextflow/mst-1/*/summary_tables/*.counts.tsv.gz') %>%
   #str_subset('top3', negate = TRUE) %>%
   post_process_table()
 ```
@@ -238,8 +239,9 @@ counts <- Sys.glob('nextflow/*/*/summary_tables/*.counts.tsv.gz') %>%
 ```{r read-eukulele}
 #| label: read-eukulele
 #| cache-lazy: false
+#| warning: false
 
-eukulele <- Sys.glob('nextflow/*/*/summary_tables/*eukulele.taxonomy.tsv.gz') %>%
+eukulele <- Sys.glob('nextflow/mst-1/*/summary_tables/*eukulele.taxonomy.tsv.gz') %>%
   str_subset('top3', negate = TRUE) %>%
   post_process_table() %>%
   mutate(
@@ -262,7 +264,8 @@ eukulele <- Sys.glob('nextflow/*/*/summary_tables/*eukulele.taxonomy.tsv.gz') %>
 
 ```{r read-diamondtax}
 #| label: read-diamondtax
-diamondtax.gtdb <- Sys.glob('nextflow/*/*/summary_tables/*.gtdb-r220.diamond.taxonomy.tsv.gz') %>%
+#| warning: false
+diamondtax.gtdb <- Sys.glob('nextflow/mst-1/*/summary_tables/*.gtdb-r220.diamond.taxonomy.tsv.gz') %>%
   #str_subset('top3', negate = TRUE) %>%
   post_process_table() %>%
   mutate(
@@ -278,7 +281,7 @@ diamondtax.gtdb <- Sys.glob('nextflow/*/*/summary_tables/*.gtdb-r220.diamond.tax
     ) %>% factor(levels = TAXON_RANKS_SORTED, ordered = TRUE)
   ) %>%
   select(-fname)
-diamondtax.refseq <- Sys.glob('nextflow/*/*/summary_tables/*.ncbi-refseq-*.diamond.taxonomy.tsv.gz') %>%
+diamondtax.refseq <- Sys.glob('nextflow/mst-1/*/summary_tables/*.ncbi-refseq-*.diamond.taxonomy.tsv.gz') %>%
   #str_subset('top3', negate = TRUE) %>%
   post_process_table() %>%
   select(-fname)
@@ -287,8 +290,9 @@ diamondtax.refseq <- Sys.glob('nextflow/*/*/summary_tables/*.ncbi-refseq-*.diamo
 ```{r read-eggnogs}
 #| label: read-eggnogs
 #| cache-lazy: false
+#| warning: false
 
-eggnogs <- Sys.glob('nextflow/*/*/summary_tables/*.emapper.tsv.gz') %>%
+eggnogs <- Sys.glob('nextflow/mst-1/*/summary_tables/*.emapper.tsv.gz') %>%
   str_subset('top3', negate = TRUE) %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
@@ -319,6 +323,7 @@ eggnogs.edger <- read_tsv(
 
 ```{r read-cog-categories}
 #| label: read-cog-categories
+#| warning: false
 
 cog_categories <- read_tsv('data/cog_categories.tsv', col_types = 'cc')
 ```
@@ -326,8 +331,9 @@ cog_categories <- read_tsv('data/cog_categories.tsv', col_types = 'cc')
 ```{r read-kofams}
 #| label: read-kofams
 #| cache-lazy: false
+#| warning: false
 
-kofams <- Sys.glob('nextflow/*/*/summary_tables/*.kofamscan.tsv.gz') %>%
+kofams <- Sys.glob('nextflow/mst-1/*/summary_tables/*.kofamscan.tsv.gz') %>%
   str_subset('top3', negate = TRUE) %>%
   read_tsv(id = 'fname', show_col_types = FALSE) %>%
   mutate(
@@ -344,8 +350,9 @@ kofams <- Sys.glob('nextflow/*/*/summary_tables/*.kofamscan.tsv.gz') %>%
 ```{r read-prokkas}
 #| label: read-prokkas
 #| cache-lazy: false
+#| warning: false
 
-prokkas <- Sys.glob('nextflow/*/*/summary_tables/*.prokka-annotations.tsv.gz') %>%
+prokkas <- Sys.glob('nextflow/mst-1/*/summary_tables/*.prokka-annotations.tsv.gz') %>%
   str_subset('top3', negate = TRUE) %>%
   read_tsv(id = 'fname', show_col_types = FALSE, guess_max = 1e6) %>%
   mutate(
@@ -362,6 +369,7 @@ prokkas <- Sys.glob('nextflow/*/*/summary_tables/*.prokka-annotations.tsv.gz') %
 ```{r func-annots}
 #| label: func-annots
 #| cache-lazy: false
+#| warning: false
 
 func_annots <- eggnogs %>% select(project:minlen, orf) %>% mutate(orf, annot = 'eggnog') %>% distinct() %>%
   union(
