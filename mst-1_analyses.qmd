@@ -1,5 +1,5 @@
 ---
-title: "nf-core/metatdenovo"
+title: "nf-core/metatdenovo MST-1"
 author: "danilo.dileo@lnu.se, emelie.nilsson@lnu.se, Arianna Krinos, Jarone Pinhassi, daniel.lundin@lnu.se"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 format:
@@ -73,10 +73,9 @@ post_process_table <- function(paths) {
       )
     ) %>%
     mutate(
-      assembly = sprintf("%s%s%s%s", 
+      assembly = sprintf("%s%s%s", 
         assembler, 
         ifelse(!is.na(bbnorm) & bbnorm == 'with_bbnorm', '*', ''), 
-        ifelse(!is.na(minlen) & minlen > 0, '†', ''), 
         ifelse(str_detect(fname, 'top3'), '3', '')
       )
     ) %>%
@@ -148,7 +147,7 @@ extraces <- Sys.glob('nextflow/mst-1/*/pipeline_info/execution_trace*') %>%
   select(-p, -fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen, process, sample)
 ```
 
@@ -222,7 +221,7 @@ idxstats <- Sys.glob('nextflow/mst-1/*/samtools/*.idxstats') %>%
   select(-r) %>%
   separate(run, c('assembler', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
   relocate(project, run, assembly, assembler, bbnorm, minlen, sample)
 ```
 
@@ -302,7 +301,7 @@ eggnogs <- Sys.glob('nextflow/mst-1/*/summary_tables/*.emapper.tsv.gz') %>%
   select(-fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
   rename_with(str_to_lower) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
 
@@ -343,7 +342,7 @@ kofams <- Sys.glob('nextflow/mst-1/*/summary_tables/*.kofamscan.tsv.gz') %>%
   select(-fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
 ```
 
@@ -362,7 +361,7 @@ prokkas <- Sys.glob('nextflow/mst-1/*/summary_tables/*.prokka-annotations.tsv.gz
   select(-fname) %>%
   separate(run, c('assembler', 'orf_caller', 'bbnorm', 'minlen'), remove = FALSE, sep = '\\.', fill = 'right') %>%
   mutate(minlen = ifelse(is.na(minlen), 0, str_remove(minlen, 'minlen') %>% as.integer())) %>%
-  mutate(assembly = sprintf("%s%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''), ifelse(minlen > 0, '†', ''))) %>%
+  mutate(assembly = sprintf("%s%s", assembler, ifelse(bbnorm == 'with_bbnorm', '*', ''))) %>%
   relocate(project, run, assembly, assembler, orf_caller, bbnorm, minlen)
 ```
 
@@ -512,7 +511,7 @@ process_groups %>%
 
 ```{r tbl-assembly-stats}
 #| label: tbl-assembly-stats
-#| tbl-cap: '**Overall statistics for MST-1 assemblies.** The runs using the Prodigal ORF caller was used for this table. *) The assembly was made from read-normalized data. †) Contigs shorter than 200 nucleotides were removed using the --min_contig_length parameter.'
+#| tbl-cap: '**Overall statistics for MST-1 assemblies.** The runs using the Prodigal ORF caller was used for this table. *) The assembly was made from read-normalized data."
 
 transrates %>%
   filter(project == 'mst-1') %>%
