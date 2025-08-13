@@ -512,7 +512,7 @@ process_groups %>%
 
 ```{r tbl-assembly-stats}
 #| label: tbl-assembly-stats
-#| tbl-cap: '**Overall statistics for MST-1 assemblies.** The runs using the Prodigal ORF caller was used for this table. *) The assembly was made from read-normalized data."
+#| tbl-cap: '**Overall statistics for MST-1 assemblies.** The runs using the Prodigal ORF caller was used for this table. *) The assembly was made from read-normalized data.'
 
 transrates %>%
   filter(project == 'mst-1') %>%
